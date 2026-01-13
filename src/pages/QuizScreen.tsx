@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useState } from "react";
 import { Quiz } from "../components/quizes";
 
 
@@ -21,20 +21,20 @@ export default function QuizScreen(){
         }, 10); 
     };
 
-    const [quiz, setQuiz] = useState(() => {
+    const [quiz] = useState(() => {
         const q = new Quiz();
         q.addQuizElm(["yes", "no", "maybe soooo"], "Is Aiden cool?", 0);
         q.addQuizElm(["yes", "no", "maybe soooo", ""], "Is Aiden bad?", 1);
         return q;
     });
 
-    const addQuestion = (answers: string[], question: string, answerIndex: number) => {
-        setQuiz(prev => {
-            const next = prev.clone();
-            next.addQuizElm(answers, question, answerIndex);
-            return next;
-        });
-    };
+    //const addQuestion = (answers: string[], question: string, answerIndex: number) => {
+    //    setQuiz(prev => {
+    //        const next = prev.clone();
+    //        next.addQuizElm(answers, question, answerIndex);
+    //        return next;
+    //    });
+    //};
 
     const answers = quiz.answers[questionIndex] ?? [];
     const question = quiz.questions[questionIndex];
