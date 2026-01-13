@@ -25,9 +25,11 @@ export default function QuizScreen() {
             try {
                 const snap = await getDoc(doc(db, "quizzes", id));
                 if (snap.exists()) {
-                    const data = snap.data() as { question: string; answers: string[]; correctIndex: number };
+                    const data = snap.data() as { questions?: Array<{ question: string; answers: string[]; correctIndex: number }> };
                     const q = new Quiz();
-                    q.addQuizElm(data.answers ?? [], data.question ?? "Untitled", data.correctIndex ?? 0);
+                    (data.questions ?? []).forEach(item => {
+                        q.addQuizElm(item.answers ?? [], item.question ?? "Untitled", item.correctIndex ?? 0);
+                    });
                     setQuiz(q);
                 } else {
                     console.warn("Quiz not found");
@@ -53,6 +55,10 @@ export default function QuizScreen() {
 
     if (loading) return <div>Loading quiz...</div>;
     if (!quiz) return <div>Quiz not found.</div>;
+
+    if (questionIndex >= quiz.questions.length) {
+        return <div>Done!</div>;
+    }
 
     const answers = quiz.answers[questionIndex] ?? [];
     const question = quiz.questions[questionIndex];

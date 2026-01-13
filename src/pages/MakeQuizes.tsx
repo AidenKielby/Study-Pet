@@ -3,10 +3,18 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
 
+type QuizItem = {
+  question: string;
+  answers: string[];
+  correctIndex: number;
+};
+
 export default function MakeQuizes() {
+  const [quizName, setQuizName] = useState("");
   const [question, setQuestion] = useState("");
   const [answers, setAnswers] = useState<string[]>(["", "", "", ""]);
   const [correctIndex, setCorrectIndex] = useState(0);
+  const [items, setItems] = useState<QuizItem[]>([]);
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
 
@@ -18,23 +26,31 @@ export default function MakeQuizes() {
     });
   };
 
-  const saveQuiz = async () => {
+  const addQuestion = () => {
     if (!question.trim()) return alert("Add a question");
-    const cleaned = answers.filter(a => a.trim());
+    const cleaned = answers.map(a => a.trim()).filter(Boolean);
     if (cleaned.length < 2) return alert("Add at least two answers");
     if (correctIndex < 0 || correctIndex >= cleaned.length) return alert("Pick a valid correct index");
+
+    setItems(prev => [...prev, { question: question.trim(), answers: cleaned, correctIndex }]);
+    setQuestion("");
+    setAnswers(["", "", "", ""]);
+    setCorrectIndex(0);
+  };
+
+  const saveQuiz = async () => {
+    if (!quizName.trim()) return alert("Add a quiz name");
+    if (items.length === 0) return alert("Add at least one question");
 
     setSaving(true);
     try {
       await addDoc(collection(db, "quizzes"), {
-        question: question.trim(),
-        answers: cleaned,
-        correctIndex,
+        name: quizName.trim(),
+        questions: items,
         createdAt: serverTimestamp()
       });
-      setQuestion("");
-      setAnswers(["", "", "", ""]);
-      setCorrectIndex(0);
+      setQuizName("");
+      setItems([]);
       alert("Quiz saved!");
     } catch (e) {
       console.error("Error adding document: ", e);
@@ -47,6 +63,14 @@ export default function MakeQuizes() {
   return (
     <div className="quiz-builder">
       <h2>Create a Quiz</h2>
+      <div className="field">
+        <label>Quiz Name</label>
+        <input
+          value={quizName}
+          onChange={e => setQuizName(e.target.value)}
+          placeholder="My awesome quiz"
+        />
+      </div>
       <div className="field">
         <label>Question</label>
         <input
@@ -76,6 +100,21 @@ export default function MakeQuizes() {
           </div>
         ))}
       </div>
+      <div className="actions">
+        <button type="button" onClick={addQuestion}>Add Question</button>
+      </div>
+
+      {items.length > 0 && (
+        <div className="preview">
+          <h3>Questions ({items.length})</h3>
+          <ol>
+            {items.map((q, i) => (
+              <li key={i}>{q.question}</li>
+            ))}
+          </ol>
+        </div>
+      )}
+
       <div className="actions">
         <button onClick={saveQuiz} disabled={saving}>
           {saving ? "Saving..." : "Save Quiz"}

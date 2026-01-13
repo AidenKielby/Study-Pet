@@ -5,7 +5,8 @@ import { db } from "../firebase";
 
 interface QuizListItem {
   id: string;
-  question: string;
+  name: string;
+  count: number;
 }
 
 export default function LoadQuiz() {
@@ -17,10 +18,14 @@ export default function LoadQuiz() {
     const fetchQuizzes = async () => {
       try {
         const snap = await getDocs(collection(db, "quizzes"));
-        const items = snap.docs.map(doc => ({
-          id: doc.id,
-          question: (doc.data().question as string) ?? "(no question)"
-        }));
+        const items = snap.docs.map(doc => {
+          const data = doc.data() as { name?: string; questions?: Array<{ question: string }> };
+          return {
+            id: doc.id,
+            name: data.name ?? "(no name)",
+            count: data.questions?.length ?? 0
+          };
+        });
         setQuizzes(items);
       } catch (e) {
         console.error("Failed to load quizzes", e);
@@ -43,7 +48,7 @@ export default function LoadQuiz() {
         <ul>
           {quizzes.map(q => (
             <li key={q.id}>
-              <span>{q.question}</span>
+              <span>{q.name} ({q.count} questions)</span>
               <button onClick={() => navigate(`/quiz/${q.id}`)}>Play</button>
             </li>
           ))}
