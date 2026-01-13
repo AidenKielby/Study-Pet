@@ -15,6 +15,8 @@ export default function Home() {
         <>
             <h1>Home</h1>
             <Link to="/quiz">Go to Quiz</Link>
+            <br />
+            <Link to="/make">Make a Quiz</Link>
             <div className="h-screen flex flex-col items-center justify-center bg-gray-100">
             <h1 className="text-3xl font-bold mb-6">Study Pet</h1>
             <Pet stage={stage} evolutions={evolutions} />
