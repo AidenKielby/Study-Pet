@@ -12,6 +12,8 @@ export default function QuizScreen() {
     const [feedback, setFeedback] = useState<string | null>(null);
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [loading, setLoading] = useState(true);
+    const [ammountCorrect, setAmmountCorect] = useState(quiz?.questions.length ?? 0);
+    const [gotWrong, setGotWrong] = useState<boolean>(false);
 
     useEffect(() => {
         const load = async () => {
@@ -33,6 +35,7 @@ export default function QuizScreen() {
                         q.addQuizElm(item.answers ?? [], item.question ?? "Untitled", item.correctIndex ?? 0);
                     });
                     setQuiz(q);
+                    setAmmountCorect(q.questions.length ?? 0);
                 } else {
                     console.warn("Quiz not found");
                 }
@@ -51,8 +54,13 @@ export default function QuizScreen() {
         if (indx === quiz.answerIndexes[questionIndex]) {
             setQuestionIndex(n => n + 1);
             setFeedback(null);
+            setGotWrong(false);
         }
         else {
+            if (!gotWrong){
+                setAmmountCorect(n => n - 1);
+            }
+            setGotWrong(true);
             setFeedback("Incorrect, try again.");
         }
         setIsPressed(true);
@@ -63,7 +71,7 @@ export default function QuizScreen() {
             const user = auth.currentUser;
             if (user){
                 const userRef = doc(db, "users", user.uid);
-                await updateDoc(userRef, {experience: increment(10)});
+                await updateDoc(userRef, {experience: increment(ammountCorrect*2)});
             }
         }
 
