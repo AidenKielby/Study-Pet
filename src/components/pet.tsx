@@ -4,18 +4,26 @@ import React from "react";
 type PetProps = {
   stage: "Baby" | "Teen" | "Adult";
   evolutions: number;
+  petChoice: number;
+  petEvolution: number;
 };
 
-const Pet: React.FC<PetProps> = ({ stage }) => {
-  let color = stage === "Baby" ? "bg-pink-400" : stage === "Teen" ? "bg-purple-400" : "bg-blue-400";
-  const petImage = "/dog.png"; // place your image at public/pet.png
+const Pet: React.FC<PetProps> = ({ petChoice, petEvolution }) => {
+  // Cap evolution at the last available sprite per pet choice to avoid broken paths.
+  const maxEvolutionByPet: Record<number, number> = {
+    1: 2,
+    2: 0,
+  };
+  const safeEvolution = Math.min(petEvolution, maxEvolutionByPet[petChoice] ?? 2);
+  const petImage = "/Pet" + petChoice + "." + safeEvolution + ".png";
 
   return (
     <motion.div
-      className={`w-32 h-32 rounded-full ${color} flex items-center justify-center overflow-hidden text-white font-bold text-xl`}
+      className="pet-shell"
+      key={petImage} /* force remount when the image path changes so the new sprite loads */
       transition={{ repeat: Infinity, duration: 1.5 }}
     >
-      <img src={petImage} alt="Your pet" className="w-full h-full object-contain" />
+      <img src={petImage} alt="Your pet" className="pet-avatar" />
       
     </motion.div>
   );

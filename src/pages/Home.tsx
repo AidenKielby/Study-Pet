@@ -71,7 +71,7 @@ export default function Home() {
 
                 <div className="pet-card card">
                     <div className="pet-preview">
-                        <Pet stage={stage} evolutions={evolutions} />
+                        <Pet stage={stage} evolutions={evolutions} petChoice={1} petEvolution={evolutions}/>
                     </div>
                     <div className="pet-stats">
                         <div className="stat">

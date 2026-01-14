@@ -357,6 +357,25 @@ button.ghost {
   justify-content: center;
 }
 
+.pet-shell {
+  width: clamp(160px, 22vw, 240px);
+  height: clamp(160px, 22vw, 240px);
+  border-radius: 18px;
+  background: radial-gradient(circle at 30% 30%, rgba(124, 121, 255, 0.25), rgba(34, 34, 51, 0.8));
+  border: 1px solid #2d2d3c;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pet-avatar {
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+}
+
 .pet-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
