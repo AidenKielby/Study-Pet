@@ -64,9 +64,8 @@ export default function Home() {
                     <h1 className="hero-title">Grow your pet while you quiz</h1>
                     <p className="muted">Finish study sessions, evolve your companion, and build custom quizzes to keep learning fun.</p>
                     <div className="cta-row">
-                        <Link to="/quiz" className="button-link primary">Start Quiz</Link>
+                        <Link to="/load" className="button-link primary">Start Quiz</Link>
                         <Link to="/make" className="button-link secondary">Build a Quiz</Link>
-                        <Link to="/load" className="button-link ghost">Load a Quiz</Link>
                     </div>
                 </div>
 

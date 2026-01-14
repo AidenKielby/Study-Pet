@@ -8,15 +8,15 @@ type PetProps = {
 
 const Pet: React.FC<PetProps> = ({ stage, evolutions }) => {
   let color = stage === "Baby" ? "bg-pink-400" : stage === "Teen" ? "bg-purple-400" : "bg-blue-400";
+  const petImage = "/alien.png"; // place your image at public/pet.png
 
   return (
     <motion.div
-      className={`w-32 h-32 rounded-full ${color} flex items-center justify-center text-white font-bold text-xl`}
+      className={`w-32 h-32 rounded-full ${color} flex items-center justify-center overflow-hidden text-white font-bold text-xl`}
       transition={{ repeat: Infinity, duration: 1.5 }}
     >
-        {evolutions}
-        {"\n"}
-        {stage}
+      <img src={petImage} alt="Your pet" className="w-full h-full object-contain" />
+      
     </motion.div>
   );
 };
