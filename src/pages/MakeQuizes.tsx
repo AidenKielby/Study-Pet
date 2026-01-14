@@ -32,7 +32,8 @@ export default function MakeQuizes() {
     if (cleaned.length < 2) return alert("Add at least two answers");
     if (correctIndex < 0 || correctIndex >= cleaned.length) return alert("Pick a valid correct index");
 
-    setItems(prev => [...prev, { question: question.trim(), answers: cleaned, correctIndex }]);
+    const safeIndex = Math.min(correctIndex, cleaned.length - 1);
+    setItems(prev => [...prev, { question: question.trim(), answers: cleaned, correctIndex: safeIndex }]);
     setQuestion("");
     setAnswers(["", "", "", ""]);
     setCorrectIndex(0);
@@ -61,9 +62,19 @@ export default function MakeQuizes() {
   };
 
   return (
-    <div className="quiz-builder">
-      <h2>Create a Quiz</h2>
-      <div className="field">
+    <div className="quiz-builder card">
+      <div className="header-row">
+        <div>
+          <p className="eyebrow">Builder</p>
+          <h2>Create a Quiz</h2>
+          <p className="muted">Add a name, stack questions, then save.</p>
+        </div>
+        <button type="button" className="secondary" onClick={() => navigate("/load")}>
+          Load a Quiz
+        </button>
+      </div>
+
+      <div className="panel">
         <label>Quiz Name</label>
         <input
           value={quizName}
@@ -71,55 +82,63 @@ export default function MakeQuizes() {
           placeholder="My awesome quiz"
         />
       </div>
-      <div className="field">
+
+      <div className="panel">
         <label>Question</label>
         <input
           value={question}
           onChange={e => setQuestion(e.target.value)}
           placeholder="Enter question"
         />
-      </div>
-      <div className="field">
-        <label>Answers</label>
-        {answers.map((ans, idx) => (
-          <div key={idx} className="answer-row">
-            <input
-              value={ans}
-              onChange={e => handleAnswerChange(idx, e.target.value)}
-              placeholder={`Answer ${idx + 1}`}
-            />
-            <label>
-              Correct
+        <div className="answers-grid">
+          {answers.map((ans, idx) => (
+            <div key={idx} className="answer-row">
               <input
-                type="radio"
-                name="correct"
-                checked={correctIndex === idx}
-                onChange={() => setCorrectIndex(idx)}
+                value={ans}
+                onChange={e => handleAnswerChange(idx, e.target.value)}
+                placeholder={`Answer ${idx + 1}`}
               />
-            </label>
-          </div>
-        ))}
-      </div>
-      <div className="actions">
-        <button type="button" onClick={addQuestion}>Add Question</button>
+              <label className="radio">
+                <input
+                  type="radio"
+                  name="correct"
+                  checked={correctIndex === idx}
+                  onChange={() => setCorrectIndex(idx)}
+                />
+                Correct
+              </label>
+            </div>
+          ))}
+        </div>
+        <div className="actions">
+          <button type="button" className="primary" onClick={addQuestion}>Add Question</button>
+        </div>
       </div>
 
       {items.length > 0 && (
-        <div className="preview">
-          <h3>Questions ({items.length})</h3>
-          <ol>
+        <div className="panel">
+          <div className="header-row">
+            <h3>Questions ({items.length})</h3>
+            <small className="muted">Saved locally until you click Save Quiz</small>
+          </div>
+          <ol className="question-list">
             {items.map((q, i) => (
-              <li key={i}>{q.question}</li>
+              <li key={i}>
+                <div className="q-text">{q.question}</div>
+                <div className="q-answers">{q.answers.map((a, idx) => (
+                  <span key={idx} className={idx === q.correctIndex ? "pill correct" : "pill"}>{a}</span>
+                ))}</div>
+              </li>
             ))}
           </ol>
         </div>
       )}
 
-      <div className="actions">
-        <button onClick={saveQuiz} disabled={saving}>
+      <div className="actions spaced">
+        <button className="primary" onClick={saveQuiz} disabled={saving}>
           {saving ? "Saving..." : "Save Quiz"}
         </button>
-        <button type="button" onClick={() => navigate("/load")}>Load a Quiz</button>
+        <button type="button" className="ghost" onClick={() => navigate("/load")}>Load a Quiz</button>
       </div>
     </div>
   );

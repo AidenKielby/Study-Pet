@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { doc, getDoc } from "firebase/firestore";
 import { Quiz } from "../components/quizes";
-import { db } from "../firebase";
+import { doc, getDoc, updateDoc, increment } from "firebase/firestore"; // add updateDoc, increment
+import { auth, db } from "../firebase";
+import { Link } from "react-router-dom";
 
 export default function QuizScreen() {
     const { id } = useParams();
     const [questionIndex, setQuestionIndex] = useState(0);
     const [isPressed, setIsPressed] = useState(false);
+    const [feedback, setFeedback] = useState<string | null>(null);
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -44,30 +46,55 @@ export default function QuizScreen() {
         load();
     }, [id]);
 
-    const handleButtonClick = (indx: number) => {
+    const handleButtonClick = async (indx: number) => {
         if (!quiz || isPressed) return;
         if (indx === quiz.answerIndexes[questionIndex]) {
             setQuestionIndex(n => n + 1);
+            setFeedback(null);
+        }
+        else {
+            setFeedback("Incorrect, try again.");
         }
         setIsPressed(true);
+        const nextIndex = questionIndex + 1;
+        const isCorrect = indx === quiz.answerIndexes[questionIndex];
+
+        if (nextIndex >= quiz.questions.length && isCorrect){
+            const user = auth.currentUser;
+            if (user){
+                const userRef = doc(db, "users", user.uid);
+                await updateDoc(userRef, {experience: increment(10)});
+            }
+        }
+
         setTimeout(() => setIsPressed(false), 10);
     };
 
     if (loading) return <div>Loading quiz...</div>;
     if (!quiz) return <div>Quiz not found.</div>;
 
-    if (questionIndex >= quiz.questions.length) {
-        return <div>Done!</div>;
-    }
-
     const answers = quiz.answers[questionIndex] ?? [];
     const question = quiz.questions[questionIndex];
+
+    if (questionIndex >= quiz.questions.length) {
+        return (
+            <div id="quiz_holder">
+                <div id="question">
+                    <a>Done!</a>
+                </div>
+                <div className="actions spaced">
+                    <Link className="primary" to="/">Back to home</Link>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div id="quiz_holder">
             <div id="question">
                 <a>{question ?? "Done"}</a>
             </div>
+            {feedback && <div className="feedback error">{feedback}</div>}
             <div id="answers" className="answers-grid">
                 {(answers ?? []).filter(Boolean).map((ans, idx) => (
                     <button key={idx} onClick={() => handleButtonClick(idx)}>{ans}</button>
