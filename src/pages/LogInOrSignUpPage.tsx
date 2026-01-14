@@ -60,6 +60,8 @@ export default function LogInOrSignUpPage() {
 		} finally {
 			setLoading(false);
 		}
+
+        console.log(loading);
 	};
 
 	return (
