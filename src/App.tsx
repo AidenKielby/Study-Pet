@@ -30,7 +30,7 @@ export default function App() {
             <div className="account-bar">
                 <span className="muted">{user ? `Signed in as ${user.displayName ?? user.email ?? user.uid}` : "Not signed in"}</span>
                 <div className="actions">
-                    {!user && <Link className="button-link secondary" to="/auth">Log in / Sign up</Link>}
+                    {!user && <Link className="button-link secondary" to="/auth">Sign in with Google</Link>}
                     {user && <button className="button-link ghost" onClick={handleSignOut}>Sign out</button>}
                 </div>
             </div>
