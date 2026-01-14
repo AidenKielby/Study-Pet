@@ -7,6 +7,7 @@ import MakeQuizes from "./pages/MakeQuizes";
 import LoadQuiz from "./pages/LoadQuiz";
 import LogInOrSignUpPage from "./pages/LogInOrSignUpPage";
 import { auth } from "./firebase";
+import AnalyticsTracker from "./AnalyticsTracker";
 
 export default function App() {
     const [user, setUser] = useState<User | null>(null);
@@ -33,6 +34,7 @@ export default function App() {
                     {user && <button className="button-link ghost" onClick={handleSignOut}>Sign out</button>}
                 </div>
             </div>
+            <AnalyticsTracker />
             <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/quiz" element={<Quiz />} />
