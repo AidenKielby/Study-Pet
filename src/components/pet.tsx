@@ -8,7 +8,7 @@ type PetProps = {
 
 const Pet: React.FC<PetProps> = ({ stage }) => {
   let color = stage === "Baby" ? "bg-pink-400" : stage === "Teen" ? "bg-purple-400" : "bg-blue-400";
-  const petImage = "/alien.png"; // place your image at public/pet.png
+  const petImage = "/dog.png"; // place your image at public/pet.png
 
   return (
     <motion.div
