@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, type User } from "firebase/auth";
-import { db, auth } from "../firebase";
+import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
+import { db, auth, googleProvider } from "../firebase";
 
 type PetStatus = { stage: "Baby" | "Teen" | "Adult"; evolutions: number };
 
@@ -28,40 +28,37 @@ export async function updatePetStatus(uid: string, partial: Partial<PetStatus>) 
 }
 
 export default function LogInOrSignUpPage() {
-	const [mode, setMode] = useState<"login" | "signup">("login");
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
-	const [confirm, setConfirm] = useState("");
 	const [message, setMessage] = useState<string | null>(null);
+	const [messageType, setMessageType] = useState<"error" | "success" | null>(null);
 	const [loading, setLoading] = useState(false);
+	const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-	const onSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
+	useEffect(() => {
+		const unsub = onAuthStateChanged(auth, setCurrentUser);
+		return unsub;
+	}, []);
+
+	const handleGoogleSignIn = async () => {
 		setMessage(null);
-		if (mode === "signup" && password !== confirm) {
-			setMessage("Passwords do not match.");
-			return;
-		}
+		setMessageType(null);
 		setLoading(true);
 		try {
-			if (mode === "signup") {
-				const cred = await createUserWithEmailAndPassword(auth, email, password);
-				await setDoc(doc(db, "users", cred.user.uid), {
-					email,
-					pet: { stage: "Baby", evolutions: 0 }
-				}, { merge: true });
-				setMessage("Account created and signed in.");
-			} else {
-				await signInWithEmailAndPassword(auth, email, password);
-				setMessage("Logged in.");
-			}
+			const cred = await signInWithPopup(auth, googleProvider);
+			const { user } = cred;
+			await setDoc(doc(db, "users", user.uid), {
+				email: user.email ?? null,
+				displayName: user.displayName ?? null,
+				photoURL: user.photoURL ?? null,
+				pet: { stage: "Baby", evolutions: 0 }
+			}, { merge: true });
+			setMessage(`Signed in as ${user.displayName ?? user.email ?? "your account"}.`);
+			setMessageType("success");
 		} catch (err: any) {
-			setMessage(err?.message ?? "Authentication failed.");
+			setMessage(err?.message ?? "Google sign-in failed.");
+			setMessageType("error");
 		} finally {
 			setLoading(false);
 		}
-
-        console.log(loading);
 	};
 
 	return (
@@ -70,70 +67,27 @@ export default function LogInOrSignUpPage() {
 				<div className="header-row">
 					<div>
 						<p className="eyebrow">Welcome</p>
-						<h2>{mode === "login" ? "Log in" : "Sign up"}</h2>
-						<p className="muted">Access your study pet and quizzes.</p>
+						<h2>Sign in with Google</h2>
+						<p className="muted">Access your study pet and quizzes in one click.</p>
 					</div>
 					<Link className="button-link ghost" to="/">Home</Link>
 				</div>
 
-				<div className="tab-row">
-					<button
-						type="button"
-						className={`tab ${mode === "login" ? "active" : ""}`}
-						onClick={() => setMode("login")}
-					>
-						Log in
-					</button>
-					<button
-						type="button"
-						className={`tab ${mode === "signup" ? "active" : ""}`}
-						onClick={() => setMode("signup")}
-					>
-						Sign up
-					</button>
-				</div>
-
-				<form className="auth-form" onSubmit={onSubmit}>
-					<label>Email</label>
-					<input
-						type="email"
-						value={email}
-						onChange={e => setEmail(e.target.value)}
-						placeholder="you@example.com"
-						required
-					/>
-
-					<label>Password</label>
-					<input
-						type="password"
-						value={password}
-						onChange={e => setPassword(e.target.value)}
-						placeholder="••••••••"
-						required
-					/>
-
-					{mode === "signup" && (
-						<>
-							<label>Confirm password</label>
-							<input
-								type="password"
-								value={confirm}
-								onChange={e => setConfirm(e.target.value)}
-								placeholder="Repeat password"
-								required
-							/>
-						</>
+				<div className="auth-form">
+					{currentUser && (
+						<div className="feedback success">Already signed in as {currentUser.displayName ?? currentUser.email ?? currentUser.uid}.</div>
 					)}
-
-					{message && <div className="feedback error">{message}</div>}
-
-					<div className="actions spaced">
-						<button type="submit" className="primary button-link full">
-							{mode === "login" ? "Log in" : "Create account"}
-						</button>
-						<Link className="button-link secondary" to="/make">Make a quiz</Link>
-					</div>
-				</form>
+					<button
+						type="button"
+						className="primary button-link full"
+						onClick={handleGoogleSignIn}
+						disabled={loading}
+					>
+						{loading ? "Connecting..." : "Continue with Google"}
+					</button>
+					<Link className="button-link secondary" to="/make">Make a quiz</Link>
+					{message && <div className={`feedback ${messageType === "error" ? "error" : "success"}`}>{message}</div>}
+				</div>
 			</div>
 		</div>
 	);

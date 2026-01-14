@@ -28,7 +28,7 @@ export default function App() {
     return (
         <BrowserRouter>
             <div className="account-bar">
-                <span className="muted">{user ? `Signed in as ${user.email ?? user.uid}` : "Not signed in"}</span>
+                <span className="muted">{user ? `Signed in as ${user.displayName ?? user.email ?? user.uid}` : "Not signed in"}</span>
                 <div className="actions">
                     {!user && <Link className="button-link secondary" to="/auth">Log in / Sign up</Link>}
                     {user && <button className="button-link ghost" onClick={handleSignOut}>Sign out</button>}
