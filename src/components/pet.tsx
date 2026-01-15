@@ -1,11 +1,17 @@
 import { motion } from "framer-motion";
 import React from "react";
+import { Move } from "./move";
 
 type PetProps = {
   stage: "Baby" | "Teen" | "Adult";
   evolutions: number;
   petChoice: number;
   petEvolution: number;
+  health: number;
+  attack: number;
+  defence: number;
+  energy: number;
+  avaulableMoves: Move[];
 };
 
 const Pet: React.FC<PetProps> = ({ petChoice, petEvolution }) => {

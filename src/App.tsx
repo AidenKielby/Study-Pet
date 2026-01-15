@@ -6,6 +6,7 @@ import Quiz from "./pages/QuizScreen";
 import MakeQuizes from "./pages/MakeQuizes";
 import LoadQuiz from "./pages/LoadQuiz";
 import LogInOrSignUpPage from "./pages/LogInOrSignUpPage";
+import PetScreen from "./pages/PetScreen";
 import { auth } from "./firebase";
 import AnalyticsTracker from "./AnalyticsTracker";
 import RoomSelector from "./pages/RoomSelector";
@@ -41,6 +42,7 @@ export default function App() {
                 <div className="nav-brand">Study Pet</div>
                 <div className="nav-links">
                     <Link to="/" className="nav-link">Home</Link>
+                    <Link to="/pet" className="nav-link">Pet</Link>
                     <Link to="/load" className="nav-link">Load Quiz</Link>
                     <Link to="/make" className="nav-link">Build Quiz</Link>
                     <Link to="/rooms" className="nav-link">Rooms</Link>
@@ -50,6 +52,7 @@ export default function App() {
             <AnalyticsTracker />
             <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/pet" element={<PetScreen />} />
                 <Route path="/quiz" element={<Quiz />} />
                 <Route path="/quiz/:id" element={<Quiz />} />
                 <Route path="/make" element={<MakeQuizes />} />

@@ -7,26 +7,38 @@ interface QuizListItem {
   id: string;
   name: string;
   count: number;
-  category?: string | null;
+  category: string | null;
 }
 
 export default function LoadQuiz() {
   const [quizzes, setQuizzes] = useState<QuizListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const navigate = useNavigate();
+
+  const normalizeCategory = (category?: string | null) => category?.trim() || "Uncategorized";
+
+  const categoryBadgeStyle = (category: string) => {
+    const hash = category.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const hue = (hash * 47) % 360;
+    return {
+      background: `hsla(${hue}, 70%, 48%, 0.16)`,
+      borderColor: `hsla(${hue}, 70%, 62%, 0.55)`,
+      color: `hsla(${hue}, 90%, 88%, 1)`
+    } as const;
+  };
 
   useEffect(() => {
     const fetchQuizzes = async () => {
       try {
         const snap = await getDocs(collection(db, "quizzes"));
         const items = snap.docs.map(doc => {
-          const data = doc.data() as { name?: string; questions?: Array<{ question: string }>; category?: string };
+          const data = doc.data() as { name?: string; questions?: Array<{ question: string }>; category?: string | null };
           return {
             id: doc.id,
             name: data.name ?? "(no name)",
             count: data.questions?.length ?? 0,
-            category: data.category?.trim() || null,
+            category: data.category?.trim() || null
           };
         });
         setQuizzes(items);
@@ -40,84 +52,110 @@ export default function LoadQuiz() {
     fetchQuizzes();
   }, []);
 
-  if (loading) return <div className="quiz-loader"><div className="panel subtle">Loading quizzes...</div></div>;
+  if (loading) return <div>Loading quizzes...</div>;
 
-  const sortedQuizzes = [...quizzes].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  const categories = sortedQuizzes
-    .filter(q => q.category)
-    .reduce<Record<string, number>>((acc, q) => {
-      const key = q.category as string;
-      acc[key] = (acc[key] ?? 0) + 1;
-      return acc;
-    }, {});
+  const categoryCounts = quizzes.reduce<Record<string, number>>((acc, quiz) => {
+    const key = normalizeCategory(quiz.category);
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
 
-  const categoryList = Object.entries(categories)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const categories = Object.keys(categoryCounts).sort((a, b) => a.localeCompare(b));
+  const filtered = selectedCategory === "all"
+    ? quizzes
+    : quizzes.filter(q => normalizeCategory(q.category) === selectedCategory);
 
-  const visibleQuizzes = selectedCategory
-    ? sortedQuizzes.filter(q => q.category === selectedCategory)
-    : sortedQuizzes.filter(q => !q.category);
+  const handleOpenQuiz = (id: string) => {
+    navigate(`/quiz/${id}`);
+  };
 
   return (
     <div className="quiz-loader">
-      <div className="quiz-loader__header">
-        <p className="eyebrow">Quizzes</p>
-        <h2>{selectedCategory ? `Category: ${selectedCategory}` : "Pick something to practice"}</h2>
-        <p className="muted">Browse your saved quizzes and jump back in.</p>
+      <div className="header-row quiz-loader__header">
+        <div>
+          <p className="eyebrow">Library</p>
+          <h2>Select a Quiz</h2>
+          <p className="muted">Pick a class/type, see how many questions are inside, and jump in.</p>
+        </div>
+        <div className="actions wrap">
+          <button className="button-link secondary" onClick={() => navigate("/make")}>Create quiz</button>
+        </div>
       </div>
 
-      {selectedCategory && (
-        <div className="actions">
-          <button className="button-link ghost" onClick={() => setSelectedCategory(null)}>Back to all</button>
+      <div className="panel subtle quiz-loader__filters">
+        <div className="filter-head">
+          <span className="muted">Filter by class / type</span>
         </div>
-      )}
-
-      {!selectedCategory && categoryList.length > 0 && (
-        <div className="category-section">
-          <div className="category-section__header">
-            <p className="eyebrow">Browse by category</p>
-            <p className="muted">Jump into a topic you care about.</p>
-          </div>
-          <div className="category-grid">
-            {categoryList.map(cat => (
-              <div key={cat.name} className="category-card" onClick={() => setSelectedCategory(cat.name)}>
-                <div className="category-card__pill">Category</div>
-                <div className="category-card__title">{cat.name}</div>
-                <div className="category-card__meta">{cat.count} quiz{cat.count === 1 ? "" : "zes"}</div>
-              </div>
-            ))}
-          </div>
+        <div className="chip-row">
+          <button
+            type="button"
+            className={selectedCategory === "all" ? "filter-chip active" : "filter-chip"}
+            onClick={() => setSelectedCategory("all")}
+          >
+            All
+            <span className="filter-chip__count">{quizzes.length}</span>
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              type="button"
+              className={selectedCategory === cat ? "filter-chip active" : "filter-chip"}
+              onClick={() => setSelectedCategory(cat)}
+            >
+              {cat}
+              <span className="filter-chip__count">{categoryCounts[cat]}</span>
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
       {quizzes.length === 0 ? (
         <div className="empty-card">
-          <h3>No quizzes yet</h3>
-          <p className="muted">Create one from the Build Quiz page, then come back to play it.</p>
-          <button className="button-link primary" onClick={() => navigate("/make")}>Build a quiz</button>
+          <p className="muted">No quizzes saved yet.</p>
+          <button className="button-link primary" onClick={() => navigate("/make")}>Create your first quiz</button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="empty-card">
+          <p className="muted">No quizzes in this class/type yet.</p>
+          <button className="button-link ghost" onClick={() => setSelectedCategory("all")}>Clear filter</button>
         </div>
       ) : (
         <div className="quiz-grid">
-          {visibleQuizzes.map(q => (
-            <div key={q.id} className="quiz-card" onClick={() => navigate(`/quiz/${q.id}`)}>
-              <div className="quiz-card__body">
-                <div className="quiz-card__badge">{q.count} question{q.count === 1 ? "" : "s"}</div>
-                <h3 className="quiz-card__title">{q.name}</h3>
-                <p className="muted">Tap to start.</p>
+          {filtered.map(q => {
+            const category = normalizeCategory(q.category);
+            return (
+              <div
+                key={q.id}
+                className="quiz-card"
+                role="button"
+                tabIndex={0}
+                onClick={() => handleOpenQuiz(q.id)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleOpenQuiz(q.id);
+                  }
+                }}
+              >
+                <div className="quiz-card__body">
+                  <span className="quiz-card__badge" style={categoryBadgeStyle(category)}>{category}</span>
+                  <h3 className="quiz-card__title">{q.name}</h3>
+                  <div className="quiz-card__meta">
+                    <span>{q.count} question{q.count === 1 ? "" : "s"}</span>
+                    <span>Type: {category}</span>
+                  </div>
+                </div>
+                <div className="quiz-card__actions">
+                  <button className="button-link primary full" onClick={e => { e.stopPropagation(); handleOpenQuiz(q.id); }}>
+                    Play
+                  </button>
+                  <button className="button-link ghost" onClick={e => { e.stopPropagation(); setSelectedCategory(category); }}>
+                    Show only this type
+                  </button>
+                </div>
               </div>
-              <div className="quiz-card__actions">
-                <button className="button-link primary" onClick={(e) => { e.stopPropagation(); navigate(`/quiz/${q.id}`); }}>Start quiz</button>
-                <button className="button-link ghost" onClick={(e) => { e.stopPropagation(); navigate(`/quiz/${q.id}`); }}>Open</button>
-              </div>
-            </div>
-          ))}
-          {visibleQuizzes.length === 0 && (
-            <div className="empty-card" style={{ gridColumn: "1 / -1" }}>
-              <h3>No quizzes in this view</h3>
-              <p className="muted">Try another category or add a new quiz.</p>
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
     </div>

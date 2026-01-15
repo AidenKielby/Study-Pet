@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Pet from "../components/pet";
+import { Move } from "../components/move";
+import { buildPetMoveIds, getRandomMove, moveSet, type MoveId, type MoveType } from "../components/moveSet";
 
 import { doc, getDoc, updateDoc, increment } from "firebase/firestore"; // add updateDoc, increment
 import { auth, db } from "../firebase";
@@ -11,6 +13,21 @@ export default function Home() {
     const [userXP, setUserXP] = useState<number>(0);
     const [feedback, setFeedback] = useState<string | null>(null);
     const [petChoice, setPetChoice] = useState<number>(1);
+    const [petType, setPetType] = useState<MoveType>("any");
+    const [petMoveIds, setPetMoveIds] = useState<MoveId[]>([]);
+    const [petLoaded, setPetLoaded] = useState(false);
+
+    // Map pet ids to their primary move type; easy to extend by adding more ids.
+    const petMoveTypes: Record<number, MoveType> = {
+        1: "elemental",
+        2: "physical",
+    };
+    const petMoves = useMemo(() => {
+        const moves = petMoveIds
+            .map(id => moveSet[id]?.move)
+            .filter(Boolean) as Move[];
+        return moves.length ? moves : getRandomMove(petType, 4).map(def => def.move);
+    }, [petMoveIds, petType]);
 
     const nextStage = () => {
         if (userXP >= 25){
@@ -45,8 +62,8 @@ export default function Home() {
     useEffect(() => {
         const unsub = auth.onAuthStateChanged(async (user) => {
             if (!user) {
-            setUserXP(0);
-            return;
+                setUserXP(0);
+                return;
             }
             const ref = doc(db, "users", user.uid);
             const snap = await getDoc(ref);
@@ -55,10 +72,42 @@ export default function Home() {
             setUserXP(data?.experience ?? 0);
             setEvolutions(petData.evolutions ?? 0);
             setStage(petData.stage ?? "Baby");
-            setPetChoice(petData.choice ?? 1);
+            const choice = Number(petData.choice ?? 1) || 1;
+            setPetChoice(choice);
+            const inferredType = petData.type as MoveType | undefined;
+            const derivedType = inferredType && inferredType !== "any" ? inferredType : (petMoveTypes[choice] ?? "any");
+            setPetType(derivedType);
+
+            const storedMoves = Array.isArray(petData.moves)
+                ? (petData.moves.filter((m: unknown): m is MoveId => typeof m === "string" && m in moveSet))
+                : [];
+            setPetMoveIds(storedMoves);
+
+            setPetLoaded(true);
         });
         return unsub;
         }, []);
+
+    // Ensure we have moves once type is known and data is loaded; generate and persist if missing.
+    useEffect(() => {
+        if (!petLoaded) return;
+        if (!petType || petMoveIds.length > 0) return;
+        const fresh = buildPetMoveIds(petType);
+        setPetMoveIds(fresh);
+    }, [petLoaded, petType, petMoveIds]);
+
+    // Persist pet type when it changes so it survives reloads.
+    useEffect(() => {
+        const user = auth.currentUser;
+        if (!user) return;
+        const ref = doc(db, "users", user.uid);
+        const persistedType = petType === "any" ? (petMoveTypes[petChoice] ?? "any") : petType;
+        updateDoc(ref, {
+            "pet.type": persistedType,
+            "pet.choice": petChoice,
+            "pet.moves": petMoveIds,
+        }).catch(() => {});
+    }, [petType, petChoice, petMoveIds]);
 
     return (
         <div className="home">
@@ -80,7 +129,8 @@ export default function Home() {
 
                 <div className="pet-card card">
                     <div className="pet-preview">
-                        <Pet stage={stage} evolutions={evolutions} petChoice={petChoice} petEvolution={evolutions}/>
+                        <Pet stage={stage} evolutions={evolutions} petChoice={petChoice} petEvolution={evolutions}
+                        health={0} attack={0} defence={0} energy={0} avaulableMoves={petMoves}/>
                     </div>
                     <div className="pet-stats">
                         <div className="stat">
@@ -97,6 +147,7 @@ export default function Home() {
                         </div>
                     </div>
                     <button className="button-link primary full" onClick={nextStage}>Use Experience</button>
+                    <Link to="/pet" className="button-link secondary">See Pet</Link>
                     {feedback && <div className="feedback error">{feedback}</div>}
                 </div>
             </div>
