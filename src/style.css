@@ -534,13 +534,16 @@ button.ghost {
 }
 
 .category-card {
-  background: #14141f;
-  border: 1px solid #252534;
-  border-radius: 12px;
-  padding: 0.9rem 1rem;
+  background: radial-gradient(circle at 20% 20%, rgba(124,121,255,0.12), rgba(27,27,38,0.95));
+  border: 1px solid #2f2f3c;
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
   cursor: pointer;
-  box-shadow: 0 10px 24px rgba(0,0,0,0.22);
-  transition: transform 120ms ease, border-color 120ms ease, box-shadow 160ms ease;
+  box-shadow: 0 12px 26px rgba(0,0,0,0.26);
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 160ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .category-card:hover {
@@ -550,14 +553,40 @@ button.ghost {
 }
 
 .category-card__title {
-  font-weight: 700;
+  font-weight: 800;
   color: #f5f6ff;
+  margin: 0.15rem 0 0;
+  letter-spacing: 0.01em;
 }
 
 .category-card__meta {
   color: #9aa0b5;
   font-weight: 600;
   margin-top: 0.25rem;
+}
+
+.category-card__pill {
+  align-self: flex-start;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(124, 121, 255, 0.14);
+  border: 1px solid rgba(124, 121, 255, 0.4);
+  color: #d7dbff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+}
+
+.category-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.category-section__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
 .empty-card {

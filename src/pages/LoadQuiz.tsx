@@ -74,13 +74,20 @@ export default function LoadQuiz() {
       )}
 
       {!selectedCategory && categoryList.length > 0 && (
-        <div className="category-grid">
-          {categoryList.map(cat => (
-            <div key={cat.name} className="category-card" onClick={() => setSelectedCategory(cat.name)}>
-              <div className="category-card__title">{cat.name}</div>
-              <div className="category-card__meta">{cat.count} quiz{cat.count === 1 ? "" : "zes"}</div>
-            </div>
-          ))}
+        <div className="category-section">
+          <div className="category-section__header">
+            <p className="eyebrow">Browse by category</p>
+            <p className="muted">Jump into a topic you care about.</p>
+          </div>
+          <div className="category-grid">
+            {categoryList.map(cat => (
+              <div key={cat.name} className="category-card" onClick={() => setSelectedCategory(cat.name)}>
+                <div className="category-card__pill">Category</div>
+                <div className="category-card__title">{cat.name}</div>
+                <div className="category-card__meta">{cat.count} quiz{cat.count === 1 ? "" : "zes"}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -97,7 +104,7 @@ export default function LoadQuiz() {
               <div className="quiz-card__body">
                 <div className="quiz-card__badge">{q.count} question{q.count === 1 ? "" : "s"}</div>
                 <h3 className="quiz-card__title">{q.name}</h3>
-                <p className="muted">Tap to start — we’ll keep your streak going.</p>
+                <p className="muted">Tap to start.</p>
               </div>
               <div className="quiz-card__actions">
                 <button className="button-link primary" onClick={(e) => { e.stopPropagation(); navigate(`/quiz/${q.id}`); }}>Start quiz</button>
