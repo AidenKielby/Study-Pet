@@ -2,19 +2,16 @@ import { useState } from "react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
+import { getIdentity } from "../identity";
 
 export default function MakeRoom() {
   const [roomName, setRoomName] = useState("");
   const [roomPass, setRoomPass] = useState("");
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
+  const identity = getIdentity(auth);
 
   const saveRoom = async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      alert("Sign in to create a room.");
-      return;
-    }
     if (!roomName.trim()) return alert("Add a room name");
     if (!roomPass.trim()) return alert("Add a room password");
 
@@ -24,8 +21,8 @@ export default function MakeRoom() {
         name: roomName.trim(),
         password: roomPass.trim(),
         users: 0,
-        createdBy: user.uid,
-        ownerName: user.displayName ?? user.email ?? "Owner",
+        createdBy: identity.uid,
+        ownerName: identity.name ?? "Unknown User",
         createdAt: serverTimestamp(),
         lastActive: serverTimestamp(),
       });

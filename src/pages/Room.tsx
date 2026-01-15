@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, limit } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { getIdentity } from "../identity";
 
 type Message = {
   id: string;
@@ -17,6 +18,7 @@ export default function Room() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const identity = getIdentity(auth);
 
   useEffect(() => {
     if (!roomId) return;
@@ -31,8 +33,6 @@ export default function Room() {
   }, [roomId]);
 
   const sendMessage = async () => {
-    const user = auth.currentUser;
-    if (!user) return alert("Sign in to chat.");
     if (!roomId) return;
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -40,8 +40,8 @@ export default function Room() {
     try {
       await addDoc(collection(db, "rooms", roomId, "messages"), {
         text: trimmed,
-        uid: user.uid,
-        displayName: user.displayName ?? user.email ?? "Anon",
+        uid: identity.uid,
+        displayName: identity.name ?? "Unknown User",
         createdAt: serverTimestamp(),
       });
       setText("");
@@ -68,10 +68,10 @@ export default function Room() {
         <div className="chat-messages">
           {messages.length === 0 && <p className="muted">No messages yet.</p>}
           {messages.map(m => {
-            const isMe = m.uid === auth.currentUser?.uid;
+            const isMe = m.uid === identity.uid;
             return (
               <div key={m.id} className={`chat-row ${isMe ? "me" : "them"}`}>
-                <div className="chat-meta">{m.displayName ?? "User"}</div>
+                <div className="chat-meta">{m.displayName ?? "Unknown User"}</div>
                 <div className="chat-bubble">{m.text}</div>
               </div>
             );

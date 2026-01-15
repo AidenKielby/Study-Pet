@@ -3,6 +3,7 @@ import { collection, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, Timest
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
 import { Link } from "react-router-dom";
+import { getIdentity } from "../identity";
 
 type RoomListItem = {
   id: string;
@@ -22,6 +23,7 @@ export default function RoomSelector() {
   const [passwordInput, setPasswordInput] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
+  const identity = getIdentity(auth);
 
   useEffect(() => {
     const fetchRooms = async () => {
@@ -99,8 +101,7 @@ export default function RoomSelector() {
   };
 
   const handleDelete = async (room: RoomListItem) => {
-    const user = auth.currentUser;
-    if (!user || user.uid !== room.createdBy) return;
+    if (identity.uid !== room.createdBy) return;
     if (!confirm("Delete this room?")) return;
     try {
       await deleteDoc(doc(db, "rooms", room.id));
@@ -130,7 +131,7 @@ export default function RoomSelector() {
         <div className="room-list">
           {rooms.map(room => {
             const open = activeRoom === room.id;
-            const isOwner = auth.currentUser?.uid === room.createdBy;
+            const isOwner = identity.uid === room.createdBy;
             return (
               <div key={room.id} className="room-card">
                 <div className="room-card-top">
