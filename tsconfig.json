@@ -23,7 +23,6 @@
     "noUncheckedSideEffectImports": true,
 
     "jsx": "react-jsx",
-    "moduleResolution": "node",
     "allowSyntheticDefaultImports": true
   },
   "include": ["src", "firebase.ts"]

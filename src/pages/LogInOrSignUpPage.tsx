@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
 import { db, auth, googleProvider } from "../firebase";
+import Pet from "../components/pet";
 
-type PetStatus = { stage: "Baby" | "Teen" | "Adult"; evolutions: number };
+type PetStatus = { stage: "Baby" | "Teen" | "Adult"; evolutions: number; choice: number };
 
 export function onUser(callback: (u: User | null) => void) {
   return onAuthStateChanged(auth, callback);
@@ -24,7 +25,12 @@ export async function savePetStatus(uid: string, pet: PetStatus) {
 
 export async function updatePetStatus(uid: string, partial: Partial<PetStatus>) {
   const ref = doc(db, "users", uid);
-  await updateDoc(ref, { "pet.stage": partial.stage, "pet.evolutions": partial.evolutions });
+	const update: Record<string, unknown> = {};
+	if (partial.stage !== undefined) update["pet.stage"] = partial.stage;
+	if (partial.evolutions !== undefined) update["pet.evolutions"] = partial.evolutions;
+	if (partial.choice !== undefined) update["pet.choice"] = partial.choice;
+	if (Object.keys(update).length === 0) return;
+	await updateDoc(ref, update);
 }
 
 export default function LogInOrSignUpPage() {
@@ -32,6 +38,9 @@ export default function LogInOrSignUpPage() {
 	const [messageType, setMessageType] = useState<"error" | "success" | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [currentUser, setCurrentUser] = useState<User | null>(null);
+	const [needsPetChoice, setNeedsPetChoice] = useState(false);
+	const [pendingUser, setPendingUser] = useState<User | null>(null);
+	const [selectedPetChoice, setSelectedPetChoice] = useState<number | null>(null);
 
 	useEffect(() => {
 		const unsub = onAuthStateChanged(auth, setCurrentUser);
@@ -45,16 +54,54 @@ export default function LogInOrSignUpPage() {
 		try {
 			const cred = await signInWithPopup(auth, googleProvider);
 			const { user } = cred;
-			await setDoc(doc(db, "users", user.uid), {
+			const ref = doc(db, "users", user.uid);
+			const snap = await getDoc(ref);
+			if (snap.exists()) {
+				await setDoc(ref, {
+					email: user.email ?? null,
+					displayName: user.displayName ?? null,
+					photoURL: user.photoURL ?? null,
+				}, { merge: true });
+				setNeedsPetChoice(false);
+				setPendingUser(null);
+				setSelectedPetChoice(null);
+				setMessage(`Signed in as ${user.displayName ?? user.email ?? "your account"}.`);
+				setMessageType("success");
+			} else {
+				setPendingUser(user);
+				setNeedsPetChoice(true);
+				setSelectedPetChoice(null);
+				setMessage("Choose your starter pet to finish setup.");
+				setMessageType(null);
+			}
+		} catch (err: any) {
+			setMessage(err?.message ?? "Google sign-in failed.");
+			setMessageType("error");
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const completePetChoice = async () => {
+		if (!pendingUser || selectedPetChoice === null) return;
+		setLoading(true);
+		try {
+			const user = pendingUser;
+			const ref = doc(db, "users", user.uid);
+			await setDoc(ref, {
 				email: user.email ?? null,
 				displayName: user.displayName ?? null,
 				photoURL: user.photoURL ?? null,
-				pet: { stage: "Baby", evolutions: 0 }
+				experience: 0,
+				pet: { stage: "Baby", evolutions: 0, choice: selectedPetChoice }
 			}, { merge: true });
-			setMessage(`Signed in as ${user.displayName ?? user.email ?? "your account"}.`);
+			setMessage("Starter pet saved! You're all set.");
 			setMessageType("success");
+			setNeedsPetChoice(false);
+			setPendingUser(null);
+			setSelectedPetChoice(null);
 		} catch (err: any) {
-			setMessage(err?.message ?? "Google sign-in failed.");
+			setMessage(err?.message ?? "Could not save your pet choice.");
 			setMessageType("error");
 		} finally {
 			setLoading(false);
@@ -94,6 +141,24 @@ export default function LogInOrSignUpPage() {
 						</span>
 						<span>{loading ? "Connecting..." : "Continue with Google"}</span>
 					</button>
+					{needsPetChoice && (
+						<div className="panel">
+							<p className="eyebrow">Pick your starter</p>
+							<p className="muted">Choose once to finish signup. You can evolve it later.</p>
+							<div className="actions">
+								<button className={`button-link ${selectedPetChoice === 1 ? "primary" : "secondary"}`} onClick={() => setSelectedPetChoice(1)} disabled={loading}>Pet 1</button>
+								<button className={`button-link ${selectedPetChoice === 2 ? "primary" : "secondary"}`} onClick={() => setSelectedPetChoice(2)} disabled={loading}>Pet 2</button>
+							</div>
+							{selectedPetChoice !== null && (
+								<div className="pet-preview" style={{ marginTop: "0.75rem" }}>
+									<Pet stage="Baby" evolutions={0} petChoice={selectedPetChoice} petEvolution={0} />
+								</div>
+							)}
+							<button className="button-link primary full" onClick={completePetChoice} disabled={loading || selectedPetChoice === null}>
+								{selectedPetChoice === null ? "Pick a pet to continue" : "Continue"}
+							</button>
+						</div>
+					)}
 					<Link className="button-link secondary" to="/make">Make a quiz</Link>
 					{message && <div className={`feedback ${messageType === "error" ? "error" : "success"}`}>{message}</div>}
 				</div>
