@@ -21,6 +21,32 @@ export default function PetScreen() {
     2: "physical",
   };
 
+  const computePetStats = (stage: "Baby" | "Teen" | "Adult", evo: number, type: MoveType) => {
+    const base = { health: 40, attack: 12, defense: 10, magic: 12, energy: 14, speed: 11 };
+    const stageMult: Record<typeof stage, number> = { Baby: 1, Teen: 1.2, Adult: 1.45 };
+    const evoBonus = { health: 3 * evo, attack: 2 * evo, defense: 2 * evo, magic: 2 * evo, energy: 2 * evo, speed: 1 * evo };
+    const typeBonus = (() => {
+      switch (type) {
+        case "magic": return { magic: 4, energy: 1, attack: 0, defense: 0, health: 0, speed: 0 };
+        case "physical": return { attack: 4, defense: 1, magic: 0, energy: 0, health: 0, speed: 0 };
+        case "elemental": return { energy: 3, magic: 1, attack: 0, defense: 0, health: 0, speed: 0 };
+        default: return { health: 0, attack: 0, defense: 0, magic: 0, energy: 0, speed: 0 };
+      }
+    })();
+
+    const mult = stageMult[stage];
+    return {
+      health: Math.round(base.health * mult + evoBonus.health + typeBonus.health),
+      attack: Math.round(base.attack * mult + evoBonus.attack + typeBonus.attack),
+      defense: Math.round(base.defense * mult + evoBonus.defense + typeBonus.defense),
+      magic: Math.round(base.magic * mult + evoBonus.magic + typeBonus.magic),
+      energy: Math.round(base.energy * mult + evoBonus.energy + typeBonus.energy),
+      speed: Math.round(base.speed * mult + evoBonus.speed + typeBonus.speed),
+    };
+  };
+
+  const petStats = useMemo(() => computePetStats(stage, evolutions, petType), [stage, evolutions, petType]);
+
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async user => {
       if (!user) {
@@ -136,6 +162,14 @@ export default function PetScreen() {
           <div className="pill-row" style={{ justifyContent: "center", marginTop: "0.5rem" }}>
             <span className="pill">Type: {petType}</span>
             <span className="pill">Evolutions: {evolutions}</span>
+          </div>
+          <div className="stat-grid" style={{ width: "100%" }}>
+            <div className="stat"><span className="label">Health</span><span className="value">{petStats.health}</span></div>
+            <div className="stat"><span className="label">Attack</span><span className="value">{petStats.attack}</span></div>
+            <div className="stat"><span className="label">Defense</span><span className="value">{petStats.defense}</span></div>
+            <div className="stat"><span className="label">Magic</span><span className="value">{petStats.magic}</span></div>
+            <div className="stat"><span className="label">Energy</span><span className="value">{petStats.energy}</span></div>
+            <div className="stat"><span className="label">Speed</span><span className="value">{petStats.speed}</span></div>
           </div>
         </div>
 
