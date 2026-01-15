@@ -11,6 +11,7 @@ type QuizItem = {
 
 export default function MakeQuizes() {
   const [quizName, setQuizName] = useState("");
+  const [quizCategory, setQuizCategory] = useState("");
   const [question, setQuestion] = useState("");
   const [answers, setAnswers] = useState<string[]>(["", "", "", ""]);
   const [correctIndex, setCorrectIndex] = useState(0);
@@ -47,10 +48,12 @@ export default function MakeQuizes() {
     try {
       await addDoc(collection(db, "quizzes"), {
         name: quizName.trim(),
+        category: quizCategory.trim() || null,
         questions: items,
         createdAt: serverTimestamp()
       });
       setQuizName("");
+      setQuizCategory("");
       setItems([]);
       alert("Quiz saved!");
     } catch (e) {
@@ -80,6 +83,15 @@ export default function MakeQuizes() {
           value={quizName}
           onChange={e => setQuizName(e.target.value)}
           placeholder="My awesome quiz"
+        />
+      </div>
+
+      <div className="panel">
+        <label>Category (optional)</label>
+        <input
+          value={quizCategory}
+          onChange={e => setQuizCategory(e.target.value)}
+          placeholder="e.g. Math, History, Science"
         />
       </div>
 

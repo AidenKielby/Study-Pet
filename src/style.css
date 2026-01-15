@@ -527,6 +527,39 @@ button.ghost {
   flex-wrap: wrap;
 }
 
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.category-card {
+  background: #14141f;
+  border: 1px solid #252534;
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.22);
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 160ms ease;
+}
+
+.category-card:hover {
+  transform: translateY(-2px);
+  border-color: #6c63ff;
+  box-shadow: 0 14px 28px rgba(0,0,0,0.3);
+}
+
+.category-card__title {
+  font-weight: 700;
+  color: #f5f6ff;
+}
+
+.category-card__meta {
+  color: #9aa0b5;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
 .empty-card {
   border: 1px dashed #2f2f3c;
   border-radius: 12px;
