@@ -83,15 +83,43 @@ export default function QuizScreen() {
 
     const answers = quiz.answers[questionIndex] ?? [];
     const question = quiz.questions[questionIndex];
+    const totalQuestions = quiz.questions.length;
+    const correct = ammountCorrect;
+    const incorrect = Math.max(0, totalQuestions - ammountCorrect);
+    const scorePercent = totalQuestions > 0 ? Math.round((correct / totalQuestions) * 100) : 0;
+
+    const restartQuiz = () => {
+        setQuestionIndex(0);
+        setAmmountCorect(totalQuestions);
+        setFeedback(null);
+        setGotWrong(false);
+    };
 
     if (questionIndex >= quiz.questions.length) {
         return (
-            <div id="quiz_holder">
-                <div id="question">
-                    <a>Done!</a>
+            <div className="quiz-complete card">
+                <p className="eyebrow">Quiz complete</p>
+                <h2>Nice work!</h2>
+                <p className="muted">Here’s how you did.</p>
+
+                <div className="score-grid">
+                    <div className="score-tile">
+                        <span className="score-value">{scorePercent}%</span>
+                        <span className="score-label">Accuracy</span>
+                    </div>
+                    <div className="score-tile">
+                        <span className="score-value">{correct}</span>
+                        <span className="score-label">Correct</span>
+                    </div>
+                    <div className="score-tile">
+                        <span className="score-value">{incorrect}</span>
+                        <span className="score-label">Missed</span>
+                    </div>
                 </div>
-                <div className="actions spaced">
-                    <Link className="primary" to="/">Back to home</Link>
+
+                <div className="actions wrap">
+                    <button className="button-link primary" onClick={restartQuiz}>Try again</button>
+                    <Link className="button-link ghost" to="/">Back to home</Link>
                 </div>
             </div>
         );
