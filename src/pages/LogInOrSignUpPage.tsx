@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
 import { db, auth, googleProvider } from "../firebase";
 import Pet from "../components/pet";
+import { buildPetMoveIds, getRandomMove, moveSet, type MoveId, type MoveType } from "../components/moveSet";
+import { Move } from "../components/move";
 
 type PetStatus = { stage: "Baby" | "Teen" | "Adult"; evolutions: number; choice: number };
 
@@ -41,6 +43,19 @@ export default function LogInOrSignUpPage() {
 	const [needsPetChoice, setNeedsPetChoice] = useState(false);
 	const [pendingUser, setPendingUser] = useState<User | null>(null);
 	const [selectedPetChoice, setSelectedPetChoice] = useState<number | null>(null);
+	const [petMoveIds] = useState<MoveId[]>([]);
+
+	const petMoveTypes: Record<number, MoveType> = {
+        1: "elemental",
+        2: "physical",
+    };
+
+	function petMoves(petType: "elemental" | "physical" | "any" | "magic"){
+		const moves = petMoveIds
+			.map(id => moveSet[id]?.move)
+			.filter(Boolean) as Move[];
+		return moves.length ? moves : getRandomMove(petType, 4).map(def => def.move);
+	}
 
 	useEffect(() => {
 		const unsub = onAuthStateChanged(auth, setCurrentUser);
@@ -151,7 +166,8 @@ export default function LogInOrSignUpPage() {
 							</div>
 							{selectedPetChoice !== null && (
 								<div className="pet-preview" style={{ marginTop: "0.75rem" }}>
-									<Pet stage="Baby" evolutions={0} petChoice={selectedPetChoice} petEvolution={0} />
+									<Pet stage="Baby" evolutions={0} petChoice={selectedPetChoice} petEvolution={0} 
+									health={10} attack={10} defence={5} energy={10} avaulableMoves={petMoves(petMoveTypes[1])}/>
 								</div>
 							)}
 							<button className="button-link primary full" onClick={completePetChoice} disabled={loading || selectedPetChoice === null}>
