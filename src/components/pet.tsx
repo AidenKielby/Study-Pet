@@ -12,7 +12,7 @@ const Pet: React.FC<PetProps> = ({ petChoice, petEvolution }) => {
   // Cap evolution at the last available sprite per pet choice to avoid broken paths.
   const maxEvolutionByPet: Record<number, number> = {
     1: 2,
-    2: 0,
+    2: 4,
   };
   const safeEvolution = Math.min(petEvolution, maxEvolutionByPet[petChoice] ?? 2);
   const petImage = "/Pet" + petChoice + "." + safeEvolution + ".png";
