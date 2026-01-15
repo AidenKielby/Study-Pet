@@ -38,11 +38,14 @@ export default function App() {
                 </div>
             </div>
             <nav className="main-nav">
-                <Link to="/" className="nav-link">Home</Link>
-                <Link to="/load" className="nav-link">Load Quiz</Link>
-                <Link to="/make" className="nav-link">Build Quiz</Link>
-                <Link to="/rooms" className="nav-link">Rooms</Link>
-                <Link to="/auth" className="nav-link">Account</Link>
+                <div className="nav-brand">Study Pet</div>
+                <div className="nav-links">
+                    <Link to="/" className="nav-link">Home</Link>
+                    <Link to="/load" className="nav-link">Load Quiz</Link>
+                    <Link to="/make" className="nav-link">Build Quiz</Link>
+                    <Link to="/rooms" className="nav-link">Rooms</Link>
+                    <Link to="/auth" className="nav-link">Account</Link>
+                </div>
             </nav>
             <AnalyticsTracker />
             <Routes>
