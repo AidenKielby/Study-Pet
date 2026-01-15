@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
 import { db, auth, googleProvider } from "../firebase";
 import Pet from "../components/pet";
-import { buildPetMoveIds, getRandomMove, moveSet, type MoveId, type MoveType } from "../components/moveSet";
+import { getRandomMove, moveSet, type MoveId, type MoveType } from "../components/moveSet";
 import { Move } from "../components/move";
 
 type PetStatus = { stage: "Baby" | "Teen" | "Adult"; evolutions: number; choice: number };
