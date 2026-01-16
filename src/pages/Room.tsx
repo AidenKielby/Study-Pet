@@ -91,19 +91,6 @@ export default function Room() {
 
   }
 
-  const getEnemyImgURL = async () => {
-    if (!roomId || !auth.currentUser) return;
-    if (!enemyUid) return;
-
-    const userRef = doc(db, "users", enemyUid);
-    const snap = await getDoc(userRef);
-    const data = snap.data();
-
-    const petData = data?.pet ?? {};
-    setEnemyEvolutions(petData?.evolutions ?? 0);
-    setEnemyPetChoice(petData?.choice ?? 1);
-  }
-
   const leaveMatch = async () => {
     if (!roomId || !auth.currentUser) return;
     const uid = auth.currentUser.uid;
@@ -134,8 +121,17 @@ export default function Room() {
   }, [roomId, auth.currentUser?.uid]);
 
   useEffect(() => {
+  if (!enemyUid) return;
+  const userRef = doc(db, "users", enemyUid);
+  return onSnapshot(userRef, snap => {
+    const pet = snap.data()?.pet ?? {};
+    setEnemyPetChoice(pet.choice ?? 1);
+    setEnemyEvolutions(pet.evolutions ?? 0);
+  });
+}, [enemyUid]);
+
+  useEffect(() => {
     if (!roomId || !auth.currentUser) return;
-    getEnemyImgURL();
     getImgURL();
   }, [roomId, auth.currentUser?.uid]);
 
