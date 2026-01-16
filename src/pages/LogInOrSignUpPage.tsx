@@ -5,6 +5,7 @@ import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
 import { db, auth, googleProvider } from "../firebase";
 import Pet from "../components/pet";
 import { getRandomMove, moveSet, type MoveId, type MoveType } from "../components/moveSet";
+import { computePetStats } from "../components/petStats";
 import { Move } from "../components/move";
 
 type PetStatus = { stage: "Baby" | "Teen" | "Adult"; evolutions: number; choice: number };
@@ -103,12 +104,14 @@ export default function LogInOrSignUpPage() {
 		try {
 			const user = pendingUser;
 			const ref = doc(db, "users", user.uid);
+			const starterType = petMoveTypes[selectedPetChoice] ?? "any";
+			const starterStats = computePetStats("Baby", 0, starterType);
 			await setDoc(ref, {
 				email: user.email ?? null,
 				displayName: user.displayName ?? null,
 				photoURL: user.photoURL ?? null,
 				experience: 0,
-				pet: { stage: "Baby", evolutions: 0, choice: selectedPetChoice }
+				pet: { stage: "Baby", evolutions: 0, choice: selectedPetChoice, type: starterType, stats: starterStats }
 			}, { merge: true });
 			setMessage("Starter pet saved! You're all set.");
 			setMessageType("success");

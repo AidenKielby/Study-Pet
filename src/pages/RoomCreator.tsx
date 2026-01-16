@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, setDoc, doc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
 import { getIdentity } from "../identity";
@@ -17,7 +17,7 @@ export default function MakeRoom() {
 
     setSaving(true);
     try {
-      await addDoc(collection(db, "rooms"), {
+      const roomRef = await addDoc(collection(db, "rooms"), {
         name: roomName.trim(),
         password: roomPass.trim(),
         users: 0,
@@ -26,13 +26,20 @@ export default function MakeRoom() {
         createdAt: serverTimestamp(),
         lastActive: serverTimestamp(),
       });
+
+      // Initialize a match document so joins have a valid parent for players
+      await setDoc(doc(db, "rooms", roomRef.id, "match", "current"), {
+        createdAt: serverTimestamp()
+      });
+
       setRoomName("");
       setRoomPass("");
       alert("Room saved!");
       navigate("/rooms");
-    } catch (e) {
+    } catch (e: any) {
+      const msg = e?.message ?? "Failed to save room";
       console.error("Error adding room: ", e);
-      alert("Failed to save room");
+      alert(msg);
     } finally {
       setSaving(false);
     }

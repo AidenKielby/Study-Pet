@@ -5,6 +5,7 @@ import { auth, db } from "../firebase";
 import Pet from "../components/pet";
 import { moveSet, getRandomMove, buildPetMoveIds, type MoveId, type MoveType } from "../components/moveSet";
 import { Move } from "../components/move";
+import { computePetStats, type ComputedPetStats } from "../components/petStats";
 
 export default function PetScreen() {
   const [loading, setLoading] = useState(true);
@@ -15,37 +16,14 @@ export default function PetScreen() {
   const [petType, setPetType] = useState<MoveType>("any");
   const [petMoveIds, setPetMoveIds] = useState<MoveId[]>([]);
   const [petLoaded, setPetLoaded] = useState(false);
+  const [petStats, setPetStats] = useState<ComputedPetStats | null>(null);
 
   const petMoveTypes: Record<number, MoveType> = {
     1: "elemental",
     2: "physical",
   };
 
-  const computePetStats = (stage: "Baby" | "Teen" | "Adult", evo: number, type: MoveType) => {
-    const base = { health: 40, attack: 12, defense: 10, magic: 12, energy: 14, speed: 11 };
-    const stageMult: Record<typeof stage, number> = { Baby: 1, Teen: 1.2, Adult: 1.45 };
-    const evoBonus = { health: 3 * evo, attack: 2 * evo, defense: 2 * evo, magic: 2 * evo, energy: 2 * evo, speed: 1 * evo };
-    const typeBonus = (() => {
-      switch (type) {
-        case "magic": return { magic: 4, energy: 1, attack: 0, defense: 0, health: 0, speed: 0 };
-        case "physical": return { attack: 4, defense: 1, magic: 0, energy: 0, health: 0, speed: 0 };
-        case "elemental": return { energy: 3, magic: 1, attack: 0, defense: 0, health: 0, speed: 0 };
-        default: return { health: 0, attack: 0, defense: 0, magic: 0, energy: 0, speed: 0 };
-      }
-    })();
-
-    const mult = stageMult[stage];
-    return {
-      health: Math.round(base.health * mult + evoBonus.health + typeBonus.health),
-      attack: Math.round(base.attack * mult + evoBonus.attack + typeBonus.attack),
-      defense: Math.round(base.defense * mult + evoBonus.defense + typeBonus.defense),
-      magic: Math.round(base.magic * mult + evoBonus.magic + typeBonus.magic),
-      energy: Math.round(base.energy * mult + evoBonus.energy + typeBonus.energy),
-      speed: Math.round(base.speed * mult + evoBonus.speed + typeBonus.speed),
-    };
-  };
-
-  const petStats = useMemo(() => computePetStats(stage, evolutions, petType), [stage, evolutions, petType]);
+  const derivedStats = useMemo(() => computePetStats(stage, evolutions, petType), [stage, evolutions, petType]);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async user => {
@@ -68,6 +46,14 @@ export default function PetScreen() {
         const inferredType = petData.type as MoveType | undefined;
         const derivedType = inferredType && inferredType !== "any" ? inferredType : (petMoveTypes[choice] ?? "any");
         setPetType(derivedType);
+
+        if (petData.stats && typeof petData.stats === "object") {
+          setPetStats(petData.stats as ComputedPetStats);
+        } else {
+          const freshStats = computePetStats(petData.stage ?? "Baby", petData.evolutions ?? 0, derivedType);
+          setPetStats(freshStats);
+          updateDoc(ref, { "pet.stats": freshStats }).catch(() => {});
+        }
 
         const storedMoves = Array.isArray(petData.moves)
           ? (petData.moves.filter((m: unknown): m is MoveId => typeof m === "string" && m in moveSet))
@@ -110,8 +96,9 @@ export default function PetScreen() {
       "pet.moves": petMoveIds,
       "pet.type": persistedType,
       "pet.choice": petChoice,
+      ...(petStats ? { "pet.stats": petStats } : { "pet.stats": derivedStats }),
     }).catch(() => {});
-  }, [petMoveIds, petType, petChoice, petLoaded]);
+  }, [petMoveIds, petType, petChoice, petStats, derivedStats, petLoaded]);
 
   const petMoves: Move[] = useMemo(() => {
     const moves = petMoveIds
@@ -119,6 +106,9 @@ export default function PetScreen() {
       .filter(Boolean) as Move[];
     return moves.length ? moves : getRandomMove(petType, 4).map(def => def.move);
   }, [petMoveIds, petType]);
+
+  // Prefer persisted stats when available; otherwise use derived.
+  const effectiveStats = petStats ?? derivedStats;
 
   const moveDetails = useMemo(() => {
     const typeIconMap: Record<MoveType, string> = {
@@ -164,12 +154,12 @@ export default function PetScreen() {
             <span className="pill">Evolutions: {evolutions}</span>
           </div>
           <div className="stat-grid" style={{ width: "100%" }}>
-            <div className="stat"><span className="label">Health</span><span className="value">{petStats.health}</span></div>
-            <div className="stat"><span className="label">Attack</span><span className="value">{petStats.attack}</span></div>
-            <div className="stat"><span className="label">Defense</span><span className="value">{petStats.defense}</span></div>
-            <div className="stat"><span className="label">Magic</span><span className="value">{petStats.magic}</span></div>
-            <div className="stat"><span className="label">Energy</span><span className="value">{petStats.energy}</span></div>
-            <div className="stat"><span className="label">Speed</span><span className="value">{petStats.speed}</span></div>
+            <div className="stat"><span className="label">Health</span><span className="value">{effectiveStats.health}</span></div>
+            <div className="stat"><span className="label">Attack</span><span className="value">{effectiveStats.attack}</span></div>
+            <div className="stat"><span className="label">Defense</span><span className="value">{effectiveStats.defense}</span></div>
+            <div className="stat"><span className="label">Magic</span><span className="value">{effectiveStats.magic}</span></div>
+            <div className="stat"><span className="label">Energy</span><span className="value">{effectiveStats.energy}</span></div>
+            <div className="stat"><span className="label">Speed</span><span className="value">{effectiveStats.speed}</span></div>
           </div>
         </div>
 

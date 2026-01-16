@@ -832,6 +832,26 @@ button.ghost {
   padding: 1.25rem 0;
 }
 
+.room-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 780px) {
+  .room-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.room-main-placeholder {
+  min-height: 480px;
+  border: 1px dashed #2a2a33;
+  border-radius: 14px;
+  background: rgba(17,17,24,0.4);
+}
+
 .room-header {
   display: flex;
   justify-content: space-between;

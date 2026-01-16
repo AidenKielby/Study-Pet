@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Pet from "../components/pet";
 import { Move } from "../components/move";
 import { buildPetMoveIds, getRandomMove, moveSet, type MoveId, type MoveType } from "../components/moveSet";
+import { computePetStats, type ComputedPetStats } from "../components/petStats";
 
 import { doc, getDoc, updateDoc, increment } from "firebase/firestore"; // add updateDoc, increment
 import { auth, db } from "../firebase";
@@ -16,6 +17,7 @@ export default function Home() {
     const [petType, setPetType] = useState<MoveType>("any");
     const [petMoveIds, setPetMoveIds] = useState<MoveId[]>([]);
     const [petLoaded, setPetLoaded] = useState(false);
+    const [petStats, setPetStats] = useState<ComputedPetStats | null>(null);
 
     // Map pet ids to their primary move type; easy to extend by adding more ids.
     const petMoveTypes: Record<number, MoveType> = {
@@ -80,6 +82,14 @@ export default function Home() {
             const derivedType = inferredType && inferredType !== "any" ? inferredType : (petMoveTypes[choice] ?? "any");
             setPetType(derivedType);
 
+            if (petData.stats && typeof petData.stats === "object") {
+                setPetStats(petData.stats as ComputedPetStats);
+            } else {
+                const freshStats = computePetStats(petData.stage ?? "Baby", petData.evolutions ?? 0, derivedType);
+                setPetStats(freshStats);
+                updateDoc(ref, { "pet.stats": freshStats }).catch(() => {});
+            }
+
             const storedMoves = Array.isArray(petData.moves)
                 ? (petData.moves.filter((m: unknown): m is MoveId => typeof m === "string" && m in moveSet))
                 : [];
@@ -108,8 +118,9 @@ export default function Home() {
             "pet.type": persistedType,
             "pet.choice": petChoice,
             "pet.moves": petMoveIds,
+            ...(petStats ? { "pet.stats": petStats } : {}),
         }).catch(() => {});
-    }, [petType, petChoice, petMoveIds]);
+    }, [petType, petChoice, petMoveIds, petStats]);
 
     return (
         <div className="home">
