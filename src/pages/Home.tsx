@@ -110,6 +110,7 @@ export default function Home() {
 
     // Persist pet type when it changes so it survives reloads.
     useEffect(() => {
+        if (!petLoaded) return; // avoid overwriting with defaults before data loads
         const user = auth.currentUser;
         if (!user) return;
         const ref = doc(db, "users", user.uid);
@@ -120,7 +121,7 @@ export default function Home() {
             "pet.moves": petMoveIds,
             ...(petStats ? { "pet.stats": petStats } : {}),
         }).catch(() => {});
-    }, [petType, petChoice, petMoveIds, petStats]);
+    }, [petType, petChoice, petMoveIds, petStats, petLoaded]);
 
     return (
         <div className="home">
