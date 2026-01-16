@@ -166,22 +166,46 @@ export default function Room() {
 
       <div className="room-body">
         <div className="room-main-placeholder" aria-hidden="true">
-            <div className="enemy-div">
-              <a>{enemyUid ? "enemy" : "waiting..."}</a>
-              {enemyUid ? (
-                  <Pet
-                  petEvolution={enemyEvolutions} petChoice={enemyPetChoice} stage={"Baby"} 
-                  health={0} attack={0} defence={0} energy={0} avaulableMoves={null} />
-              ) : null }
+          <div className="battle-field">
+            <div className="battle-sky" />
+            <div className="battle-grid">
+              <div className="battle-slot enemy-slot">
+                <div className="slot-label">{enemyUid ? "Enemy" : "Waiting for enemy"}</div>
+                {enemyUid ? (
+                  <div className="battle-pet">
+                    <Pet
+                      petEvolution={enemyEvolutions}
+                      petChoice={enemyPetChoice}
+                      stage={"Baby"}
+                      health={0}
+                      attack={0}
+                      defence={0}
+                      energy={0}
+                      avaulableMoves={null}
+                    />
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="battle-slot player-slot">
+                <div className="slot-label">You</div>
+                {isInMatch ? (
+                  <div className="battle-pet">
+                    <Pet
+                      petEvolution={playerEvolutions}
+                      petChoice={playerPetChoice}
+                      stage={"Baby"}
+                      health={0}
+                      attack={0}
+                      defence={0}
+                      energy={0}
+                      avaulableMoves={null}
+                    />
+                  </div>
+                ) : null}
+              </div>
             </div>
-            <div className="player-div">
-              <a>{isInMatch ? auth.currentUser?.displayName : "no one in match"}</a>
-              {isInMatch ? (
-                <Pet
-                  petEvolution={playerEvolutions} petChoice={playerPetChoice} stage={"Baby"} 
-                  health={0} attack={0} defence={0} energy={0} avaulableMoves={null} />
-              ) : null}
-            </div>
+          </div>
         </div>
 
         <div className="chat-panel">

@@ -847,9 +847,108 @@ button.ghost {
 
 .room-main-placeholder {
   min-height: 480px;
-  border: 1px dashed #2a2a33;
+  border: none;
   border-radius: 14px;
-  background: rgba(17,17,24,0.4);
+  background: none;
+  padding: 0;
+}
+
+.battle-field {
+  position: relative;
+  height: 100%;
+  min-height: 480px;
+  width: 100%;
+  padding: 2rem 1.5rem;
+  background: url("/battleFeild.png") center/cover no-repeat;
+  border-radius: 14px;
+  overflow: hidden;
+  box-sizing: border-box; /* keep padding inside the column so it doesn't overlap chat */
+}
+
+.battle-sky {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(108,99,255,0.14), transparent 36%),
+    radial-gradient(circle at 80% 18%, rgba(124,121,255,0.12), transparent 32%),
+    radial-gradient(circle at 50% 60%, rgba(45,212,191,0.08), transparent 42%);
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.battle-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  height: 100%;
+  align-items: end;
+  z-index: 1;
+}
+
+.battle-slot {
+  position: relative;
+  min-height: 240px;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.battle-slot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 110%, rgba(0,0,0,0.28), transparent 55%);
+  pointer-events: none;
+}
+
+.slot-label {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid #2a2a33;
+  color: #d7dbff;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  z-index: 2;
+}
+
+.battle-pet {
+  position: relative;
+  z-index: 2;
+  transform: translateY(170px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: clamp(140px, 24vw, 220px);
+}
+
+/* Only in the room battle field, strip the default pet shell styling so sprites sit directly on the field */
+.battle-pet .pet-shell {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.battle-pet .pet-avatar {
+  width: 100%;
+  height: auto;
+}
+
+.enemy-slot .slot-circle {
+  background: radial-gradient(circle at 50% 50%, rgba(255,107,107,0.08), rgba(255,143,143,0.08), rgba(0,0,0,0.35));
+}
+
+.player-slot .slot-circle {
+  background: radial-gradient(circle at 50% 50%, rgba(124,121,255,0.12), rgba(108,99,255,0.1), rgba(0,0,0,0.35));
 }
 
 .room-header {
