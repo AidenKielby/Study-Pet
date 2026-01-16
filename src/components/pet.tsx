@@ -4,14 +4,13 @@ import { Move } from "./move";
 
 type PetProps = {
   stage: "Baby" | "Teen" | "Adult";
-  evolutions: number;
   petChoice: number;
   petEvolution: number;
   health: number;
   attack: number;
   defence: number;
   energy: number;
-  avaulableMoves: Move[];
+  avaulableMoves: Move[] | null;
 };
 
 const Pet: React.FC<PetProps> = ({ petChoice, petEvolution }) => {
