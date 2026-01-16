@@ -98,6 +98,23 @@ export default function Room() {
     await deleteDoc(doc(playersRef, uid)); // now matches the join doc id
   };
 
+  // Auto-leave the match if the user navigates away or closes the tab.
+  useEffect(() => {
+    if (!roomId || !auth.currentUser) return;
+
+    const handleUnload = () => {
+      void leaveMatch();
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+
+    // Also leave when the component unmounts (route change).
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      void leaveMatch();
+    };
+  }, [roomId, auth.currentUser?.uid]);
+
   // Subscribe to the user's presence in the match
   useEffect(() => {
     if (!roomId || !auth.currentUser) return;
