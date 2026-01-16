@@ -147,7 +147,7 @@ export default function PetScreen() {
       <div className="pet-profile__layout">
         <div className="card pet-profile__visual">
           <div className="pet-preview">
-            <Pet stage={stage} evolutions={evolutions} petChoice={petChoice} petEvolution={evolutions} health={0} attack={0} defence={0} energy={0} avaulableMoves={petMoves} />
+            <Pet stage={stage} petChoice={petChoice} petEvolution={evolutions} health={0} attack={0} defence={0} energy={0} avaulableMoves={petMoves} />
           </div>
           <div className="pill-row" style={{ justifyContent: "center", marginTop: "0.5rem" }}>
             <span className="pill">Type: {petType}</span>

@@ -169,7 +169,7 @@ export default function LogInOrSignUpPage() {
 							</div>
 							{selectedPetChoice !== null && (
 								<div className="pet-preview" style={{ marginTop: "0.75rem" }}>
-									<Pet stage="Baby" evolutions={0} petChoice={selectedPetChoice} petEvolution={0} 
+									<Pet stage="Baby" petChoice={selectedPetChoice} petEvolution={0} 
 									health={10} attack={10} defence={5} energy={10} avaulableMoves={petMoves(petMoveTypes[1])}/>
 								</div>
 							)}
