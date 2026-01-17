@@ -4,10 +4,11 @@ import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, limit,
 import { auth, db } from "../firebase";
 import { getIdentity } from "../identity";
 import Pet from "../components/pet";
-import { moveList, moveSet, type MoveId } from "../components/moveSet";
+import { moveList, moveSet, type MoveId, type MoveType } from "../components/moveSet";
+import { computePetStats } from "../components/petStats";
 
-const MAX_HEALTH = 120;
-const ROUND_HEAL = Math.round(MAX_HEALTH * 0.25);
+const DEFAULT_MAX_HEALTH = 120;
+const ROUND_HEAL_RATIO = 0.25;
 const LOG_LIMIT = 8;
 
 type Message = {
@@ -16,6 +17,28 @@ type Message = {
   uid: string;
   displayName?: string;
   createdAt?: { seconds: number; nanoseconds: number };
+};
+
+const normalizeStage = (stage: unknown): "Baby" | "Teen" | "Adult" => {
+  return stage === "Teen" || stage === "Adult" ? stage : "Baby";
+};
+
+const normalizeMoveType = (value: unknown): MoveType => {
+  return value === "magic" || value === "physical" || value === "elemental" ? value : "any";
+};
+
+const deriveMaxHealth = (pet: Record<string, unknown> | undefined): number => {
+  if (pet && typeof pet === "object") {
+    const stats = pet.stats as { health?: unknown } | undefined;
+    if (stats && typeof stats.health === "number" && stats.health > 0) {
+      return stats.health;
+    }
+    const stage = normalizeStage(pet.stage);
+    const evolutions = typeof pet.evolutions === "number" ? pet.evolutions : Number(pet.evolutions ?? 0) || 0;
+    const type = normalizeMoveType(pet.type);
+    return computePetStats(stage, evolutions, type).health;
+  }
+  return DEFAULT_MAX_HEALTH;
 };
 
 export default function Room() {
@@ -41,8 +64,10 @@ export default function Room() {
   const [player2Queue, setPlayer2Queue] = useState<MoveId[]>([]);
   const [player1Loadout, setPlayer1Loadout] = useState<MoveId[]>([]);
   const [player2Loadout, setPlayer2Loadout] = useState<MoveId[]>([]);
-  const [player1Health, setPlayer1Health] = useState(MAX_HEALTH);
-  const [player2Health, setPlayer2Health] = useState(MAX_HEALTH);
+  const [player1MaxHealth, setPlayer1MaxHealth] = useState(DEFAULT_MAX_HEALTH);
+  const [player2MaxHealth, setPlayer2MaxHealth] = useState(DEFAULT_MAX_HEALTH);
+  const [player1Health, setPlayer1Health] = useState(DEFAULT_MAX_HEALTH);
+  const [player2Health, setPlayer2Health] = useState(DEFAULT_MAX_HEALTH);
   const [player1Defense, setPlayer1Defense] = useState(0);
   const [player2Defense, setPlayer2Defense] = useState(0);
   const [battleLog, setBattleLog] = useState<string[]>([]);
@@ -60,18 +85,20 @@ export default function Room() {
     const nextRound = roundNumber + 1;
     const logEntries: string[] = [`Round ${nextRound} begins!`];
 
-    const healPlayer = (setter: Dispatch<SetStateAction<number>>) => {
+    const healPlayer = (setter: Dispatch<SetStateAction<number>>, maxHealth: number) => {
       let applied = 0;
       setter(prev => {
-        const next = Math.min(MAX_HEALTH, prev + ROUND_HEAL);
+        const allowance = Math.max(1, Math.round(maxHealth * ROUND_HEAL_RATIO));
+        const targetMax = maxHealth || DEFAULT_MAX_HEALTH;
+        const next = Math.min(targetMax, prev + allowance);
         applied = next - prev;
         return next;
       });
       return applied;
     };
 
-    const heal1 = healPlayer(setPlayer1Health);
-    const heal2 = healPlayer(setPlayer2Health);
+    const heal1 = healPlayer(setPlayer1Health, player1MaxHealth);
+    const heal2 = healPlayer(setPlayer2Health, player2MaxHealth);
 
     if (heal1 > 0) logEntries.push(`Player 1 recovers +${heal1} HP`);
     if (heal2 > 0) logEntries.push(`Player 2 recovers +${heal2} HP`);
@@ -92,7 +119,7 @@ export default function Room() {
       const next = [...prev, ...logEntries];
       return next.length > LOG_LIMIT ? next.slice(-LOG_LIMIT) : next;
     });
-  }, [player1Loadout, player2Loadout, roundNumber]);
+  }, [player1Loadout, player2Loadout, roundNumber, player1MaxHealth, player2MaxHealth]);
 
   useEffect(() => {
     player1DefenseRef.current = player1Defense;
@@ -199,7 +226,7 @@ export default function Room() {
     setRefreshUsed(true);
   };
 
-  const setReady = async (flag: boolean) => {
+  const setReady = useCallback(async (flag: boolean) => {
     if (!roomId || !auth.currentUser) return;
     const uid = auth.currentUser.uid;
     const playersRef = collection(db, "rooms", roomId, "match", "current", "players");
@@ -214,7 +241,7 @@ export default function Room() {
       { merge: true }
     );
     setMyReady(flag);
-  };
+  }, [roomId, auth.currentUser, moveOrder, myMoves]);
 
   // Auto-leave the match if the user navigates away or closes the tab.
   useEffect(() => {
@@ -283,8 +310,8 @@ export default function Room() {
       setPlayer2Loadout([...player2Moves]);
       setPlayer1Queue([...player1Moves]);
       setPlayer2Queue([...player2Moves]);
-      setPlayer1Health(MAX_HEALTH);
-      setPlayer2Health(MAX_HEALTH);
+      setPlayer1Health(player1MaxHealth);
+      setPlayer2Health(player2MaxHealth);
       setPlayer1Defense(0);
       setPlayer2Defense(0);
       player1DefenseRef.current = 0;
@@ -299,7 +326,7 @@ export default function Room() {
     return () => {
       cancelled = true;
     };
-  }, [allReady, roundStart, roomId, slotAUid, slotBUid]);
+  }, [allReady, roundStart, roomId, slotAUid, slotBUid, player1MaxHealth, player2MaxHealth]);
 
   // reset when players unready or leave
   useEffect(() => {
@@ -309,8 +336,8 @@ export default function Room() {
       setPlayer2Queue([]);
       setWinner(null);
       setBattleLog([]);
-      setPlayer1Health(MAX_HEALTH);
-      setPlayer2Health(MAX_HEALTH);
+      setPlayer1Health(player1MaxHealth);
+      setPlayer2Health(player2MaxHealth);
       setPlayer1Defense(0);
       setPlayer2Defense(0);
       setPlayer1Loadout([]);
@@ -320,7 +347,7 @@ export default function Room() {
       player1DefenseRef.current = 0;
       player2DefenseRef.current = 0;
     }
-  }, [allReady]);
+  }, [allReady, player1MaxHealth, player2MaxHealth]);
 
   // process turns sequentially
   useEffect(() => {
@@ -352,12 +379,14 @@ export default function Room() {
 
       const applyHealing = (
         setter: Dispatch<SetStateAction<number>>,
-        amount: number
+        amount: number,
+        maxHealth: number
       ) => {
         if (amount <= 0) return 0;
         let healed = 0;
         setter(prev => {
-          const next = Math.min(MAX_HEALTH, prev + amount);
+          const targetMax = maxHealth || DEFAULT_MAX_HEALTH;
+          const next = Math.min(targetMax, prev + amount);
           healed = next - prev;
           return next;
         });
@@ -383,7 +412,8 @@ export default function Room() {
         actorDefenseRef: MutableRefObject<number>,
         targetHealthSetter: Dispatch<SetStateAction<number>>,
         targetDefenseSetter: Dispatch<SetStateAction<number>>,
-        targetDefenseRef: MutableRefObject<number>
+        targetDefenseRef: MutableRefObject<number>,
+        actorMaxHealth: number
       ) => {
         if (!moveId) return;
         const def = moveSet[moveId];
@@ -399,12 +429,12 @@ export default function Room() {
           segments.push(`-${dealt} HP`);
           if (blocked > 0) segments.push(`${blocked} blocked`);
         } else if (damage < 0) {
-          const healed = applyHealing(actorHealthSetter, Math.abs(damage));
+          const healed = applyHealing(actorHealthSetter, Math.abs(damage), actorMaxHealth);
           if (healed > 0) segments.push(`+${healed} HP`);
         }
 
         if (statRaised === "health" && statAmount > 0) {
-          const healed = applyHealing(actorHealthSetter, statAmount);
+          const healed = applyHealing(actorHealthSetter, statAmount, actorMaxHealth);
           if (healed > 0) segments.push(`+${healed} HP`);
         } else if (statRaised === "defense" && statAmount > 0) {
           const boosted = boostDefense(actorDefenseSetter, actorDefenseRef, statAmount);
@@ -426,7 +456,8 @@ export default function Room() {
         player1DefenseRef,
         setPlayer2Health,
         setPlayer2Defense,
-        player2DefenseRef
+        player2DefenseRef,
+        player1MaxHealth
       );
 
       processMove(
@@ -437,7 +468,8 @@ export default function Room() {
         player2DefenseRef,
         setPlayer1Health,
         setPlayer1Defense,
-        player1DefenseRef
+        player1DefenseRef,
+        player2MaxHealth
       );
 
       if (logEntries.length) {
@@ -452,7 +484,7 @@ export default function Room() {
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [roundStart, player1Queue, player2Queue, winner]);
+  }, [roundStart, player1Queue, player2Queue, winner, player1MaxHealth, player2MaxHealth]);
 
   useEffect(() => {
     if (!awaitingNextRound || roundStart || !allReady) return;
@@ -511,8 +543,13 @@ export default function Room() {
       const pet = snap.data()?.pet ?? {};
       setSlotAPetChoice(pet.choice ?? 1);
       setSlotAEvolutions(pet.evolutions ?? 0);
+      const maxHealth = deriveMaxHealth(pet);
+      setPlayer2MaxHealth(maxHealth);
+      if (!roundStart) {
+        setPlayer2Health(maxHealth);
+      }
     });
-  }, [slotAUid]);
+  }, [slotAUid, roundStart]);
 
   useEffect(() => {
     if (!slotBUid) return;
@@ -521,8 +558,13 @@ export default function Room() {
       const pet = snap.data()?.pet ?? {};
       setSlotBPetChoice(pet.choice ?? 1);
       setSlotBEvolutions(pet.evolutions ?? 0);
+      const maxHealth = deriveMaxHealth(pet);
+      setPlayer1MaxHealth(maxHealth);
+      if (!roundStart) {
+        setPlayer1Health(maxHealth);
+      }
     });
-  }, [slotBUid]);
+  }, [slotBUid, roundStart]);
 
   useEffect(() => {
     if (!roomId || !auth.currentUser) return;
@@ -546,8 +588,8 @@ export default function Room() {
       setPlayer2Queue([]);
       setBattleLog([]);
       setWinner(null);
-      setPlayer1Health(MAX_HEALTH);
-      setPlayer2Health(MAX_HEALTH);
+      setPlayer1Health(player1MaxHealth);
+      setPlayer2Health(player2MaxHealth);
       setPlayer1Defense(0);
       setPlayer2Defense(0);
       setPlayer1Loadout([]);
@@ -557,7 +599,7 @@ export default function Room() {
       player1DefenseRef.current = 0;
       player2DefenseRef.current = 0;
     }
-  }, [slotAUid, slotBUid]);
+  }, [slotAUid, slotBUid, player1MaxHealth, player2MaxHealth]);
 
   useEffect(() => {
     if (!myReady) {
@@ -588,7 +630,10 @@ export default function Room() {
     </div>
   );
 
-  const healthPercent = (value: number) => Math.max(0, Math.min(100, (value / MAX_HEALTH) * 100));
+  const healthPercent = (value: number, max: number) => {
+    const safeMax = max > 0 ? max : DEFAULT_MAX_HEALTH;
+    return Math.max(0, Math.min(100, (value / safeMax) * 100));
+  };
   const showBattleLog = battleLog.length > 0 || Boolean(winner);
 
   if (!roomId) return <div className="room">No room selected.</div>;
@@ -658,11 +703,11 @@ export default function Room() {
                     <span className="defense-chip">DEF {player2Defense}</span>
                   </div>
                   <div className="health-bar">
-                    <span style={{ width: `${healthPercent(player2Health)}%` }} />
+                    <span style={{ width: `${healthPercent(player2Health, player2MaxHealth)}%` }} />
                   </div>
                   <div className="health-metrics">
                     <strong>
-                      {player2Health}/{MAX_HEALTH} HP
+                      {player2Health}/{player2MaxHealth} HP
                     </strong>
                   </div>
                 </div>
@@ -672,11 +717,11 @@ export default function Room() {
                     <span className="defense-chip">DEF {player1Defense}</span>
                   </div>
                   <div className="health-bar">
-                    <span style={{ width: `${healthPercent(player1Health)}%` }} />
+                    <span style={{ width: `${healthPercent(player1Health, player1MaxHealth)}%` }} />
                   </div>
                   <div className="health-metrics">
                     <strong>
-                      {player1Health}/{MAX_HEALTH} HP
+                      {player1Health}/{player1MaxHealth} HP
                     </strong>
                   </div>
                 </div>

@@ -8,6 +8,14 @@ import { computePetStats, type ComputedPetStats } from "../components/petStats";
 import { doc, getDoc, updateDoc, increment } from "firebase/firestore"; // add updateDoc, increment
 import { auth, db } from "../firebase";
 
+const statKeys: Array<keyof ComputedPetStats> = ["health", "attack", "defense", "magic", "energy", "speed"];
+
+const statsEqual = (a: ComputedPetStats | null, b: ComputedPetStats | null) => {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    return statKeys.every(key => a[key] === b[key]);
+};
+
 export default function Home() {
     const [stage, setStage] = useState<"Baby" | "Teen" | "Adult">("Baby");
     const [evolutions, setEvolutions] = useState<number>(0);
@@ -99,6 +107,12 @@ export default function Home() {
         });
         return unsub;
         }, []);
+
+    useEffect(() => {
+        if (!petLoaded) return;
+        const derivedStats = computePetStats(stage, evolutions, petType);
+        setPetStats(current => (statsEqual(current, derivedStats) ? current : derivedStats));
+    }, [stage, evolutions, petType, petLoaded]);
 
     // Ensure we have moves once type is known and data is loaded; generate and persist if missing.
     useEffect(() => {
