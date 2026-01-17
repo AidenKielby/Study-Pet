@@ -887,12 +887,17 @@ button.ghost {
 }
 
 .ability-panel {
-  margin-top: 1rem;
-  background: rgba(11,11,16,0.75);
+  position: absolute;
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(540px, calc(100% - 1.5rem));
+  background: rgba(11,11,16,0.8);
   border: 1px solid #262637;
   border-radius: 12px;
   padding: 0.75rem;
   backdrop-filter: blur(6px);
+  z-index: 3;
 }
 
 .ability-header {
