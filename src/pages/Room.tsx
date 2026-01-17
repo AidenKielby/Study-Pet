@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { useParams } from "react-router-dom";
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, limit, getCountFromServer, getDocs, where, deleteDoc, doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { getIdentity } from "../identity";
 import Pet from "../components/pet";
 import { moveList, moveSet, type MoveId } from "../components/moveSet";
+
+const MAX_HEALTH = 120;
+const LOG_LIMIT = 8;
 
 type Message = {
   id: string;
@@ -35,13 +38,26 @@ export default function Room() {
   const [roundStart, setRoundStart] = useState(false);
   const [player1Queue, setPlayer1Queue] = useState<MoveId[]>([]);
   const [player2Queue, setPlayer2Queue] = useState<MoveId[]>([]);
-  const [player1Health, setPlayer1Health] = useState(100);
-  const [player2Health, setPlayer2Health] = useState(100);
+  const [player1Health, setPlayer1Health] = useState(MAX_HEALTH);
+  const [player2Health, setPlayer2Health] = useState(MAX_HEALTH);
+  const [player1Defense, setPlayer1Defense] = useState(0);
+  const [player2Defense, setPlayer2Defense] = useState(0);
   const [battleLog, setBattleLog] = useState<string[]>([]);
   const [winner, setWinner] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const player1DefenseRef = useRef(0);
+  const player2DefenseRef = useRef(0);
   const identity = getIdentity(auth);
+
+  useEffect(() => {
+    player1DefenseRef.current = player1Defense;
+  }, [player1Defense]);
+
+  useEffect(() => {
+    player2DefenseRef.current = player2Defense;
+  }, [player2Defense]);
+
 
   useEffect(() => {
     if (!roomId) return;
@@ -221,8 +237,12 @@ export default function Room() {
       if (cancelled) return;
       setPlayer1Queue(player1Moves);
       setPlayer2Queue(player2Moves);
-      setPlayer1Health(100);
-      setPlayer2Health(100);
+      setPlayer1Health(MAX_HEALTH);
+      setPlayer2Health(MAX_HEALTH);
+      setPlayer1Defense(0);
+      setPlayer2Defense(0);
+      player1DefenseRef.current = 0;
+      player2DefenseRef.current = 0;
       setBattleLog([]);
       setWinner(null);
       setRoundStart(true);
@@ -241,8 +261,12 @@ export default function Room() {
       setPlayer2Queue([]);
       setWinner(null);
       setBattleLog([]);
-      setPlayer1Health(100);
-      setPlayer2Health(100);
+      setPlayer1Health(MAX_HEALTH);
+      setPlayer2Health(MAX_HEALTH);
+      setPlayer1Defense(0);
+      setPlayer2Defense(0);
+      player1DefenseRef.current = 0;
+      player2DefenseRef.current = 0;
     }
   }, [allReady]);
 
@@ -254,25 +278,121 @@ export default function Room() {
     const timer = setTimeout(() => {
       const p1Move = player1Queue[0];
       const p2Move = player2Queue[0];
+      const logEntries: string[] = [];
 
-      if (p1Move) {
-        const dmg = moveSet[p1Move]?.move.getDammageDealt() ?? 0;
-        if (dmg > 0) {
-          setPlayer2Health(h => Math.max(0, h - dmg));
-          setBattleLog(log => [...log.slice(-5), `Player 1 used ${moveSet[p1Move]?.name ?? p1Move} (-${dmg} HP)`]);
-        } else {
-          setBattleLog(log => [...log.slice(-5), `Player 1 used ${moveSet[p1Move]?.name ?? p1Move}`]);
+      const applyDamage = (
+        amount: number,
+        targetHealthSetter: Dispatch<SetStateAction<number>>,
+        targetDefenseRef: MutableRefObject<number>,
+        targetDefenseSetter: Dispatch<SetStateAction<number>>
+      ) => {
+        if (amount <= 0) return { dealt: 0, blocked: 0 };
+        const defenseValue = targetDefenseRef.current;
+        const mitigated = Math.max(0, amount - defenseValue);
+        const blocked = Math.max(0, amount - mitigated);
+        targetHealthSetter(h => Math.max(0, h - mitigated));
+        if (defenseValue > 0) {
+          targetDefenseSetter(prev => Math.max(0, prev - 1));
+          targetDefenseRef.current = Math.max(0, defenseValue - 1);
         }
-      }
+        return { dealt: mitigated, blocked };
+      };
 
-      if (p2Move) {
-        const dmg = moveSet[p2Move]?.move.getDammageDealt() ?? 0;
-        if (dmg > 0) {
-          setPlayer1Health(h => Math.max(0, h - dmg));
-          setBattleLog(log => [...log.slice(-5), `Player 2 used ${moveSet[p2Move]?.name ?? p2Move} (-${dmg} HP)`]);
-        } else {
-          setBattleLog(log => [...log.slice(-5), `Player 2 used ${moveSet[p2Move]?.name ?? p2Move}`]);
+      const applyHealing = (
+        setter: Dispatch<SetStateAction<number>>,
+        amount: number
+      ) => {
+        if (amount <= 0) return 0;
+        let healed = 0;
+        setter(prev => {
+          const next = Math.min(MAX_HEALTH, prev + amount);
+          healed = next - prev;
+          return next;
+        });
+        return healed;
+      };
+
+      const boostDefense = (
+        setter: Dispatch<SetStateAction<number>>,
+        ref: MutableRefObject<number>,
+        amount: number
+      ) => {
+        if (amount <= 0) return 0;
+        setter(prev => prev + amount);
+        ref.current += amount;
+        return amount;
+      };
+
+      const processMove = (
+        moveId: MoveId | undefined,
+        actorLabel: "Player 1" | "Player 2",
+        actorHealthSetter: Dispatch<SetStateAction<number>>,
+        actorDefenseSetter: Dispatch<SetStateAction<number>>,
+        actorDefenseRef: MutableRefObject<number>,
+        targetHealthSetter: Dispatch<SetStateAction<number>>,
+        targetDefenseSetter: Dispatch<SetStateAction<number>>,
+        targetDefenseRef: MutableRefObject<number>
+      ) => {
+        if (!moveId) return;
+        const def = moveSet[moveId];
+        if (!def) return;
+        const move = def.move;
+        const damage = move.getDammageDealt();
+        const statRaised = move.getStatRaised();
+        const statAmount = move.getStatIncreaser();
+        const segments: string[] = [];
+
+        if (damage > 0) {
+          const { dealt, blocked } = applyDamage(damage, targetHealthSetter, targetDefenseRef, targetDefenseSetter);
+          segments.push(`-${dealt} HP`);
+          if (blocked > 0) segments.push(`${blocked} blocked`);
+        } else if (damage < 0) {
+          const healed = applyHealing(actorHealthSetter, Math.abs(damage));
+          if (healed > 0) segments.push(`+${healed} HP`);
         }
+
+        if (statRaised === "health" && statAmount > 0) {
+          const healed = applyHealing(actorHealthSetter, statAmount);
+          if (healed > 0) segments.push(`+${healed} HP`);
+        } else if (statRaised === "defense" && statAmount > 0) {
+          const boosted = boostDefense(actorDefenseSetter, actorDefenseRef, statAmount);
+          if (boosted > 0) segments.push(`DEF +${boosted}`);
+        }
+
+        if (segments.length === 0) {
+          logEntries.push(`${actorLabel} used ${def.name ?? moveId}`);
+        } else {
+          logEntries.push(`${actorLabel} used ${def.name ?? moveId} (${segments.join(", ")})`);
+        }
+      };
+
+      processMove(
+        p1Move,
+        "Player 1",
+        setPlayer1Health,
+        setPlayer1Defense,
+        player1DefenseRef,
+        setPlayer2Health,
+        setPlayer2Defense,
+        player2DefenseRef
+      );
+
+      processMove(
+        p2Move,
+        "Player 2",
+        setPlayer2Health,
+        setPlayer2Defense,
+        player2DefenseRef,
+        setPlayer1Health,
+        setPlayer1Defense,
+        player1DefenseRef
+      );
+
+      if (logEntries.length) {
+        setBattleLog(prev => {
+          const next = [...prev, ...logEntries];
+          return next.length > LOG_LIMIT ? next.slice(-LOG_LIMIT) : next;
+        });
       }
 
       setPlayer1Queue(prev => (prev.length ? prev.slice(1) : prev));
@@ -348,8 +468,12 @@ export default function Room() {
       setPlayer2Queue([]);
       setBattleLog([]);
       setWinner(null);
-      setPlayer1Health(100);
-      setPlayer2Health(100);
+      setPlayer1Health(MAX_HEALTH);
+      setPlayer2Health(MAX_HEALTH);
+      setPlayer1Defense(0);
+      setPlayer2Defense(0);
+      player1DefenseRef.current = 0;
+      player2DefenseRef.current = 0;
     }
   }, [slotAUid, slotBUid]);
 
@@ -376,7 +500,7 @@ export default function Room() {
     </div>
   );
 
-  const healthPercent = (value: number) => Math.max(0, Math.min(100, value));
+  const healthPercent = (value: number) => Math.max(0, Math.min(100, (value / MAX_HEALTH) * 100));
 
   if (!roomId) return <div className="room">No room selected.</div>;
 
@@ -440,18 +564,32 @@ export default function Room() {
             {roundStart ? (
               <div className="health-hud">
                 <div className="health-badge enemy">
-                  <span className="health-label">Player 2 HP</span>
+                  <div className="health-header">
+                    <span className="health-label">Player 2</span>
+                    <span className="defense-chip">DEF {player2Defense}</span>
+                  </div>
                   <div className="health-bar">
                     <span style={{ width: `${healthPercent(player2Health)}%` }} />
                   </div>
-                  <strong>{player2Health}</strong>
+                  <div className="health-metrics">
+                    <strong>
+                      {player2Health}/{MAX_HEALTH} HP
+                    </strong>
+                  </div>
                 </div>
                 <div className="health-badge player">
-                  <span className="health-label">Player 1 HP</span>
+                  <div className="health-header">
+                    <span className="health-label">Player 1</span>
+                    <span className="defense-chip">DEF {player1Defense}</span>
+                  </div>
                   <div className="health-bar">
                     <span style={{ width: `${healthPercent(player1Health)}%` }} />
                   </div>
-                  <strong>{player1Health}</strong>
+                  <div className="health-metrics">
+                    <strong>
+                      {player1Health}/{MAX_HEALTH} HP
+                    </strong>
+                  </div>
                 </div>
               </div>
             ) : null}

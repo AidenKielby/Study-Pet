@@ -8,7 +8,9 @@ export type MoveId =
 	| "warp-feint"
 	| "comet-lance"
 	| "aurora-shell"
-	| "quasar-burst";
+	| "quasar-burst"
+	| "stellar-mend"
+	| "luminous-bloom";
 
 export type MoveDefinition = {
 	id: MoveId;
@@ -68,6 +70,18 @@ export const moveSet: Record<MoveId, MoveDefinition> = {
 		name: "Quasar Burst",
 		description: "High-cost star core blast that amplifies spell potency after use.",
 		move: new Move(34, "magic", 4, 12, "elemental", 4),
+	},
+	"stellar-mend": {
+		id: "stellar-mend",
+		name: "Stellar Mend",
+		description: "Pulls radiant dust into wounds for a mid-battle heal.",
+		move: new Move(0, "health", 24, 6, "magic", 2),
+	},
+	"luminous-bloom": {
+		id: "luminous-bloom",
+		name: "Luminous Bloom",
+		description: "Photosynthetic flare chips foes while rejuvenating the caster.",
+		move: new Move(10, "health", 14, 5, "elemental", 2),
 	},
 };
 
