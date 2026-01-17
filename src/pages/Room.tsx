@@ -175,10 +175,13 @@ export default function Room() {
   }, [roomId, auth.currentUser?.uid]);
 
   useEffect(() => {
-    if (!roomId || !auth.currentUser) return;
-    if (!slotAUid || !slotBUid) return;
-    startRound();
-  }, [roomId, auth.currentUser?.uid]);
+    if (!roomId) return;
+    if (slotAUid && slotBUid) {
+      setRoundActive(true);
+    } else {
+      setRoundActive(false);
+    }
+  }, [roomId, slotAUid, slotBUid]);
 
   if (!roomId) return <div className="room">No room selected.</div>;
 
