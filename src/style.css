@@ -1132,13 +1132,20 @@ button.ghost {
 }
 
 .battle-log {
-  margin-top: 1.25rem;
+  margin: 0;
   background: linear-gradient(145deg, rgba(9,12,28,0.92), rgba(15,20,42,0.9));
   border: 1px solid rgba(124, 178, 255, 0.28);
   border-radius: 16px;
   padding: 1rem;
   z-index: 2;
   box-shadow: 0 24px 40px rgba(3,5,14,0.68);
+  width: 100%;
+}
+
+.battle-log--sidebar {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
 }
 
 .battle-log ul {
@@ -1259,6 +1266,12 @@ button.ghost {
 
 .room-header button {
   font-weight: 600;
+}
+
+.sidebar-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .chat-panel {

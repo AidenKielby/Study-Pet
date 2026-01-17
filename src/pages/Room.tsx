@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { useParams } from "react-router-dom";
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, limit, getCountFromServer, getDocs, where, deleteDoc, doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
@@ -7,6 +7,7 @@ import Pet from "../components/pet";
 import { moveList, moveSet, type MoveId } from "../components/moveSet";
 
 const MAX_HEALTH = 120;
+const ROUND_HEAL = Math.round(MAX_HEALTH * 0.25);
 const LOG_LIMIT = 8;
 
 type Message = {
@@ -38,17 +39,56 @@ export default function Room() {
   const [roundStart, setRoundStart] = useState(false);
   const [player1Queue, setPlayer1Queue] = useState<MoveId[]>([]);
   const [player2Queue, setPlayer2Queue] = useState<MoveId[]>([]);
+  const [player1Loadout, setPlayer1Loadout] = useState<MoveId[]>([]);
+  const [player2Loadout, setPlayer2Loadout] = useState<MoveId[]>([]);
   const [player1Health, setPlayer1Health] = useState(MAX_HEALTH);
   const [player2Health, setPlayer2Health] = useState(MAX_HEALTH);
   const [player1Defense, setPlayer1Defense] = useState(0);
   const [player2Defense, setPlayer2Defense] = useState(0);
   const [battleLog, setBattleLog] = useState<string[]>([]);
   const [winner, setWinner] = useState<string | null>(null);
+  const [roundNumber, setRoundNumber] = useState(1);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const player1DefenseRef = useRef(0);
   const player2DefenseRef = useRef(0);
   const identity = getIdentity(auth);
+
+  const startNextRound = useCallback(() => {
+    if (!player1Loadout.length || !player2Loadout.length) return;
+    const nextRound = roundNumber + 1;
+    const logEntries: string[] = [`Round ${nextRound} begins!`];
+
+    const healPlayer = (setter: Dispatch<SetStateAction<number>>) => {
+      let applied = 0;
+      setter(prev => {
+        const next = Math.min(MAX_HEALTH, prev + ROUND_HEAL);
+        applied = next - prev;
+        return next;
+      });
+      return applied;
+    };
+
+    const heal1 = healPlayer(setPlayer1Health);
+    const heal2 = healPlayer(setPlayer2Health);
+
+    if (heal1 > 0) logEntries.push(`Player 1 recovers +${heal1} HP`);
+    if (heal2 > 0) logEntries.push(`Player 2 recovers +${heal2} HP`);
+
+    setRoundNumber(nextRound);
+    setPlayer1Queue([...player1Loadout]);
+    setPlayer2Queue([...player2Loadout]);
+    setPlayer1Defense(0);
+    setPlayer2Defense(0);
+    player1DefenseRef.current = 0;
+    player2DefenseRef.current = 0;
+    setRefreshUsed(false);
+
+    setBattleLog(prev => {
+      const next = [...prev, ...logEntries];
+      return next.length > LOG_LIMIT ? next.slice(-LOG_LIMIT) : next;
+    });
+  }, [player1Loadout, player2Loadout, roundNumber]);
 
   useEffect(() => {
     player1DefenseRef.current = player1Defense;
@@ -235,15 +275,18 @@ export default function Room() {
       const player2Moves = toMoveIds(topDoc?.data()?.moves);
 
       if (cancelled) return;
-      setPlayer1Queue(player1Moves);
-      setPlayer2Queue(player2Moves);
+      setPlayer1Loadout([...player1Moves]);
+      setPlayer2Loadout([...player2Moves]);
+      setPlayer1Queue([...player1Moves]);
+      setPlayer2Queue([...player2Moves]);
       setPlayer1Health(MAX_HEALTH);
       setPlayer2Health(MAX_HEALTH);
       setPlayer1Defense(0);
       setPlayer2Defense(0);
       player1DefenseRef.current = 0;
       player2DefenseRef.current = 0;
-      setBattleLog([]);
+      setRoundNumber(1);
+      setBattleLog(player1Moves.length || player2Moves.length ? ["Round 1 begins!"] : []);
       setWinner(null);
       setRoundStart(true);
     })();
@@ -265,6 +308,9 @@ export default function Room() {
       setPlayer2Health(MAX_HEALTH);
       setPlayer1Defense(0);
       setPlayer2Defense(0);
+      setPlayer1Loadout([]);
+      setPlayer2Loadout([]);
+      setRoundNumber(1);
       player1DefenseRef.current = 0;
       player2DefenseRef.current = 0;
     }
@@ -402,7 +448,7 @@ export default function Room() {
     return () => clearTimeout(timer);
   }, [roundStart, player1Queue, player2Queue, winner]);
 
-  // determine winner based on health or exhausted moves
+  // determine winner based on health or start additional rounds when moves are exhausted
   useEffect(() => {
     if (!roundStart || winner) return;
     if (player1Health <= 0 && player2Health <= 0) {
@@ -417,14 +463,21 @@ export default function Room() {
       setWinner("Player 1");
       return;
     }
-    if (player1Queue.length === 0 && player2Queue.length === 0) {
-      if (player1Health === player2Health) {
-        setWinner("Draw");
-      } else {
-        setWinner(player1Health > player2Health ? "Player 1" : "Player 2");
-      }
+
+    const queuesEmpty = player1Queue.length === 0 && player2Queue.length === 0;
+    if (!queuesEmpty) return;
+
+    if (player1Health > 0 && player2Health > 0 && player1Loadout.length > 0 && player2Loadout.length > 0) {
+      startNextRound();
+      return;
     }
-  }, [roundStart, winner, player1Health, player2Health, player1Queue, player2Queue]);
+
+    if (player1Health === player2Health) {
+      setWinner("Draw");
+    } else {
+      setWinner(player1Health > player2Health ? "Player 1" : "Player 2");
+    }
+  }, [roundStart, winner, player1Health, player2Health, player1Queue, player2Queue, player1Loadout, player2Loadout, startNextRound]);
 
   useEffect(() => {
     if (!slotAUid) return;
@@ -472,6 +525,9 @@ export default function Room() {
       setPlayer2Health(MAX_HEALTH);
       setPlayer1Defense(0);
       setPlayer2Defense(0);
+      setPlayer1Loadout([]);
+      setPlayer2Loadout([]);
+      setRoundNumber(1);
       player1DefenseRef.current = 0;
       player2DefenseRef.current = 0;
     }
@@ -501,6 +557,7 @@ export default function Room() {
   );
 
   const healthPercent = (value: number) => Math.max(0, Math.min(100, (value / MAX_HEALTH) * 100));
+  const showBattleLog = battleLog.length > 0 || Boolean(winner);
 
   if (!roomId) return <div className="room">No room selected.</div>;
 
@@ -630,49 +687,52 @@ export default function Room() {
                 ) : null}
               </div>
             </div>
-            {roundStart ? (
-              <div className="battle-log">
-                {winner ? <div className="winner-banner">Winner: {winner}</div> : null}
-                <ul>
-                  {battleLog.map((entry, idx) => (
-                    <li key={`${entry}-${idx}`}>{entry}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
           </div>
         </div>
 
-        <div className="chat-panel">
-          <div className="chat-messages">
-            {messages.length === 0 && <p className="muted">No messages yet.</p>}
-            {messages.map(m => {
-              const isMe = m.uid === identity.uid;
-              return (
-                <div key={m.id} className={`chat-row ${isMe ? "me" : "them"}`}>
-                  <div className="chat-meta">{m.displayName ?? "Unknown User"}</div>
-                  <div className="chat-bubble">{m.text}</div>
-                </div>
-              );
-            })}
-            <div ref={bottomRef} />
+        <div className="sidebar-stack">
+          <div className="chat-panel">
+            <div className="chat-messages">
+              {messages.length === 0 && <p className="muted">No messages yet.</p>}
+              {messages.map(m => {
+                const isMe = m.uid === identity.uid;
+                return (
+                  <div key={m.id} className={`chat-row ${isMe ? "me" : "them"}`}>
+                    <div className="chat-meta">{m.displayName ?? "Unknown User"}</div>
+                    <div className="chat-bubble">{m.text}</div>
+                  </div>
+                );
+              })}
+              <div ref={bottomRef} />
+            </div>
+            <div className="chat-input">
+              <input
+                value={text}
+                onChange={e => setText(e.target.value)}
+                placeholder="Say something nice"
+                onKeyDown={e => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+              />
+              <button className="button-link primary" onClick={sendMessage} disabled={sending || !text.trim()}>
+                {sending ? "Sending..." : "Send"}
+              </button>
+            </div>
           </div>
-          <div className="chat-input">
-            <input
-              value={text}
-              onChange={e => setText(e.target.value)}
-              placeholder="Say something nice"
-              onKeyDown={e => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-            />
-            <button className="button-link primary" onClick={sendMessage} disabled={sending || !text.trim()}>
-              {sending ? "Sending..." : "Send"}
-            </button>
-          </div>
+
+          {showBattleLog ? (
+            <div className="battle-log battle-log--sidebar">
+              {winner ? <div className="winner-banner">Winner: {winner}</div> : null}
+              <ul>
+                {battleLog.map((entry, idx) => (
+                  <li key={`${entry}-${idx}`}>{entry}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
