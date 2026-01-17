@@ -199,6 +199,25 @@ export default function Room() {
         <div className="room-main-placeholder" aria-hidden="true">
           <div className="battle-field">
             <div className="battle-sky" />
+            {roundActive && moveOrder.length > 0 ? (
+              <div className="ability-panel">
+                <div className="ability-header">
+                  <p className="eyebrow">Your abilities</p>
+                  <span className="muted">Reorder locally — database stays unchanged</span>
+                </div>
+                <ul className="ability-list">
+                  {moveOrder.map((moveId, idx) => (
+                    <li key={`${moveId}-${idx}`} className="ability-row">
+                      <span className="ability-name">{moveId}</span>
+                      <div className="ability-actions">
+                        <button onClick={() => moveUp(idx)} disabled={idx === 0}>↑</button>
+                        <button onClick={() => moveDown(idx)} disabled={idx === moveOrder.length - 1}>↓</button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <div className="battle-grid">
               <div className="battle-slot enemy-slot">
                 <div className="slot-label">{slotAUid ? "Player 1" : "Waiting for player"}</div>
@@ -236,25 +255,6 @@ export default function Room() {
                 ) : null}
               </div>
             </div>
-            {roundActive && moveOrder.length > 0 ? (
-              <div className="ability-panel">
-                <div className="ability-header">
-                  <p className="eyebrow">Your abilities</p>
-                  <span className="muted">Reorder locally — database stays unchanged</span>
-                </div>
-                <ul className="ability-list">
-                  {moveOrder.map((moveId, idx) => (
-                    <li key={`${moveId}-${idx}`} className="ability-row">
-                      <span className="ability-name">{moveId}</span>
-                      <div className="ability-actions">
-                        <button onClick={() => moveUp(idx)} disabled={idx === 0}>↑</button>
-                        <button onClick={() => moveDown(idx)} disabled={idx === moveOrder.length - 1}>↓</button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
           </div>
         </div>
 
