@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, limit, getCountFromServer, getDocs, where, deleteDoc, doc, setDoc, getDoc } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, limit, getCountFromServer, getDocs, where, deleteDoc, doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { getIdentity } from "../identity";
 import Pet from "../components/pet";
@@ -18,13 +18,19 @@ export default function Room() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [isInMatch, setIsInMatch] = useState(false);
-  const [playerEvolutions, setPlayerEvolutions] = useState(0);
-  const [playerPetChoice, setPlayerPetChoice] = useState(1);
 
-  const [enemyEvolutions, setEnemyEvolutions] = useState(0);
-  const [enemyPetChoice, setEnemyPetChoice] = useState(1);
-  const [enemyUid, setEnemyUid] = useState<string | null>(null);
+  const [slotAUid, setSlotAUid] = useState<string | null>(null);
+  const [slotBUid, setSlotBUid] = useState<string | null>(null);
+  const [slotAEvolutions, setSlotAEvolutions] = useState(0);
+  const [slotAPetChoice, setSlotAPetChoice] = useState(1);
+  const [slotBEvolutions, setSlotBEvolutions] = useState(0);
+  const [slotBPetChoice, setSlotBPetChoice] = useState(1);
+
+  const [myMoves, setMyMoves] = useState<string[]>([]);
+  const [moveOrder, setMoveOrder] = useState<string[]>([]);
+
+  const [roundIndex, setRoundIndex] = useState(0);
+  const [roundActive, setRoundActive] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const identity = getIdentity(auth);
@@ -78,24 +84,34 @@ export default function Room() {
     await setDoc(doc(playersRef, uid), { uid });
   }
 
-  const getImgURL = async () => {
-    if (!roomId || !auth.currentUser) return;
-    const uid = auth.currentUser.uid;
-    const userRef = doc(db, "users", uid);
-    const snap = await getDoc(userRef);
-    const data = snap.data();
-
-    const petData = data?.pet ?? {};
-    setPlayerEvolutions(petData?.evolutions ?? 0);
-    setPlayerPetChoice(petData?.choice ?? 1);
-
-  }
-
   const leaveMatch = async () => {
     if (!roomId || !auth.currentUser) return;
     const uid = auth.currentUser.uid;
     const playersRef = collection(db, "rooms", roomId, "match", "current", "players");
     await deleteDoc(doc(playersRef, uid)); // now matches the join doc id
+  };
+
+  const startRound = async () => {
+    setRoundActive(true);
+    
+  }
+
+  const moveUp = (index: number) => {
+    if (index <= 0) return;
+    setMoveOrder(prev => {
+      const next = [...prev];
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      return next;
+    });
+  };
+
+  const moveDown = (index: number) => {
+    setMoveOrder(prev => {
+      if (index < 0 || index >= prev.length - 1) return prev;
+      const next = [...prev];
+      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+      return next;
+    });
   };
 
   // Auto-leave the match if the user navigates away or closes the tab.
@@ -115,41 +131,53 @@ export default function Room() {
     };
   }, [roomId, auth.currentUser?.uid]);
 
-  // Subscribe to the user's presence in the match
   useEffect(() => {
-    if (!roomId || !auth.currentUser) return;
-    const uid = auth.currentUser.uid;
-    const playersRef = collection(db, "rooms", roomId, "match", "current", "players");
-    const unsub = onSnapshot(doc(playersRef, uid), snap => {
-      setIsInMatch(snap.exists());
-    });
-    return unsub;
-  }, [roomId, auth.currentUser?.uid]);
-
-  useEffect(() => {
-    if (!roomId || !auth.currentUser) return;
-    const uid = auth.currentUser.uid;
+    if (!roomId) return;
     const playersRef = collection(db, "rooms", roomId, "match", "current", "players");
     const unsub = onSnapshot(playersRef, snap => {
-      const others = snap.docs.map(d => d.id).filter(id => id !== uid);
-      setEnemyUid(others[0] ?? null);
+      const uids = snap.docs.map(d => d.id);
+      setSlotAUid(uids[0] ?? null);
+      setSlotBUid(uids[1] ?? null);
     });
     return unsub;
-  }, [roomId, auth.currentUser?.uid]);
+  }, [roomId]);
 
   useEffect(() => {
-  if (!enemyUid) return;
-  const userRef = doc(db, "users", enemyUid);
-  return onSnapshot(userRef, snap => {
-    const pet = snap.data()?.pet ?? {};
-    setEnemyPetChoice(pet.choice ?? 1);
-    setEnemyEvolutions(pet.evolutions ?? 0);
-  });
-}, [enemyUid]);
+    if (!slotAUid) return;
+    const userRef = doc(db, "users", slotAUid);
+    return onSnapshot(userRef, snap => {
+      const pet = snap.data()?.pet ?? {};
+      setSlotAPetChoice(pet.choice ?? 1);
+      setSlotAEvolutions(pet.evolutions ?? 0);
+    });
+  }, [slotAUid]);
+
+  useEffect(() => {
+    if (!slotBUid) return;
+    const userRef = doc(db, "users", slotBUid);
+    return onSnapshot(userRef, snap => {
+      const pet = snap.data()?.pet ?? {};
+      setSlotBPetChoice(pet.choice ?? 1);
+      setSlotBEvolutions(pet.evolutions ?? 0);
+    });
+  }, [slotBUid]);
 
   useEffect(() => {
     if (!roomId || !auth.currentUser) return;
-    getImgURL();
+    const userRef = doc(db, "users", auth.currentUser.uid);
+    return onSnapshot(userRef, snap => {
+      const pet = snap.data()?.pet ?? {};
+      const moves = Array.isArray(pet.moves) ? pet.moves.filter((m: unknown): m is string => typeof m === "string") : [];
+      setMyMoves(moves);
+      // If the moveOrder is empty or moves changed length, reset order to the fetched moves.
+      setMoveOrder(prev => (prev.length === 0 || prev.length !== moves.length ? [...moves] : prev));
+    });
+  }, [roomId, auth.currentUser?.uid]);
+
+  useEffect(() => {
+    if (!roomId || !auth.currentUser) return;
+    if (!slotAUid || !slotBUid) return;
+    startRound();
   }, [roomId, auth.currentUser?.uid]);
 
   if (!roomId) return <div className="room">No room selected.</div>;
@@ -170,12 +198,12 @@ export default function Room() {
             <div className="battle-sky" />
             <div className="battle-grid">
               <div className="battle-slot enemy-slot">
-                <div className="slot-label">{enemyUid ? "Enemy" : "Waiting for enemy"}</div>
-                {enemyUid ? (
+                <div className="slot-label">{slotAUid ? "Player 1" : "Waiting for player"}</div>
+                {slotAUid ? (
                   <div className="battle-pet">
                     <Pet
-                      petEvolution={enemyEvolutions}
-                      petChoice={enemyPetChoice}
+                      petEvolution={slotAEvolutions}
+                      petChoice={slotAPetChoice}
                       stage={"Baby"}
                       health={0}
                       attack={0}
@@ -188,12 +216,12 @@ export default function Room() {
               </div>
 
               <div className="battle-slot player-slot">
-                <div className="slot-label">You</div>
-                {isInMatch ? (
+                <div className="slot-label">{slotBUid ? "Player 2" : "Waiting for player"}</div>
+                {slotBUid ? (
                   <div className="battle-pet">
                     <Pet
-                      petEvolution={playerEvolutions}
-                      petChoice={playerPetChoice}
+                      petEvolution={slotBEvolutions}
+                      petChoice={slotBPetChoice}
                       stage={"Baby"}
                       health={0}
                       attack={0}
@@ -205,6 +233,25 @@ export default function Room() {
                 ) : null}
               </div>
             </div>
+            {roundActive && moveOrder.length > 0 ? (
+              <div className="ability-panel">
+                <div className="ability-header">
+                  <p className="eyebrow">Your abilities</p>
+                  <span className="muted">Reorder locally — database stays unchanged</span>
+                </div>
+                <ul className="ability-list">
+                  {moveOrder.map((moveId, idx) => (
+                    <li key={moveId} className="ability-row">
+                      <span className="ability-name">{moveId}</span>
+                      <div className="ability-actions">
+                        <button onClick={() => moveUp(idx)} disabled={idx === 0}>↑</button>
+                        <button onClick={() => moveDown(idx)} disabled={idx === moveOrder.length - 1}>↓</button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         </div>
 
