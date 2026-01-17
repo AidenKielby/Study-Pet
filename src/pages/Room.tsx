@@ -47,6 +47,7 @@ export default function Room() {
   const [player2Defense, setPlayer2Defense] = useState(0);
   const [battleLog, setBattleLog] = useState<string[]>([]);
   const [winner, setWinner] = useState<string | null>(null);
+  const [awaitingNextRound, setAwaitingNextRound] = useState(false);
   const [roundNumber, setRoundNumber] = useState(1);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -83,6 +84,9 @@ export default function Room() {
     player1DefenseRef.current = 0;
     player2DefenseRef.current = 0;
     setRefreshUsed(false);
+    setAwaitingNextRound(false);
+    setRoundStart(true);
+    setWinner(null);
 
     setBattleLog(prev => {
       const next = [...prev, ...logEntries];
@@ -287,6 +291,7 @@ export default function Room() {
       player2DefenseRef.current = 0;
       setRoundNumber(1);
       setBattleLog(player1Moves.length || player2Moves.length ? ["Round 1 begins!"] : []);
+      setAwaitingNextRound(false);
       setWinner(null);
       setRoundStart(true);
     })();
@@ -311,6 +316,7 @@ export default function Room() {
       setPlayer1Loadout([]);
       setPlayer2Loadout([]);
       setRoundNumber(1);
+      setAwaitingNextRound(false);
       player1DefenseRef.current = 0;
       player2DefenseRef.current = 0;
     }
@@ -448,7 +454,12 @@ export default function Room() {
     return () => clearTimeout(timer);
   }, [roundStart, player1Queue, player2Queue, winner]);
 
-  // determine winner based on health or start additional rounds when moves are exhausted
+  useEffect(() => {
+    if (!awaitingNextRound || roundStart || !allReady) return;
+    startNextRound();
+  }, [awaitingNextRound, roundStart, allReady, startNextRound]);
+
+  // determine winner based on health or pause for next round
   useEffect(() => {
     if (!roundStart || winner) return;
     if (player1Health <= 0 && player2Health <= 0) {
@@ -468,7 +479,21 @@ export default function Room() {
     if (!queuesEmpty) return;
 
     if (player1Health > 0 && player2Health > 0 && player1Loadout.length > 0 && player2Loadout.length > 0) {
-      startNextRound();
+      if (!awaitingNextRound) {
+        setAwaitingNextRound(true);
+        setRoundStart(false);
+        setBattleLog(prev => {
+          const message = `Round ${roundNumber} complete — reorder and refresh before readying up.`;
+          const next = [...prev, message];
+          return next.length > LOG_LIMIT ? next.slice(-LOG_LIMIT) : next;
+        });
+        setPlayer1Queue([]);
+        setPlayer2Queue([]);
+        setRefreshUsed(false);
+        if (myReady) {
+          void setReady(false);
+        }
+      }
       return;
     }
 
@@ -477,7 +502,7 @@ export default function Room() {
     } else {
       setWinner(player1Health > player2Health ? "Player 1" : "Player 2");
     }
-  }, [roundStart, winner, player1Health, player2Health, player1Queue, player2Queue, player1Loadout, player2Loadout, startNextRound]);
+  }, [roundStart, winner, player1Health, player2Health, player1Queue, player2Queue, player1Loadout, player2Loadout, awaitingNextRound, roundNumber, myReady, setReady]);
 
   useEffect(() => {
     if (!slotAUid) return;
@@ -528,6 +553,7 @@ export default function Room() {
       setPlayer1Loadout([]);
       setPlayer2Loadout([]);
       setRoundNumber(1);
+      setAwaitingNextRound(false);
       player1DefenseRef.current = 0;
       player2DefenseRef.current = 0;
     }
@@ -538,6 +564,12 @@ export default function Room() {
       setRefreshUsed(false);
     }
   }, [myReady]);
+
+  useEffect(() => {
+    if (awaitingNextRound) {
+      setRefreshUsed(false);
+    }
+  }, [awaitingNextRound]);
 
   const renderMoveTrack = (queue: MoveId[], label: string) => (
     <div className="move-track__inner">
