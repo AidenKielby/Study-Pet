@@ -4,6 +4,7 @@ import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, limit,
 import { auth, db } from "../firebase";
 import { getIdentity } from "../identity";
 import Pet from "../components/pet";
+import { moveList, moveSet, type MoveId } from "../components/moveSet";
 
 type Message = {
   id: string;
@@ -26,8 +27,11 @@ export default function Room() {
   const [slotBEvolutions, setSlotBEvolutions] = useState(0);
   const [slotBPetChoice, setSlotBPetChoice] = useState(1);
 
-  const [myMoves, setMyMoves] = useState<string[]>([]);
-  const [moveOrder, setMoveOrder] = useState<string[]>([]);
+  const [myMoves, setMyMoves] = useState<MoveId[]>([]);
+  const [moveOrder, setMoveOrder] = useState<MoveId[]>([]);
+  const [refreshUsed, setRefreshUsed] = useState(false);
+  const [myReady, setMyReady] = useState(false);
+  const [allReady, setAllReady] = useState(false);
 
   const [roundIndex, setRoundIndex] = useState(0);
   const [roundActive, setRoundActive] = useState(false);
@@ -81,7 +85,7 @@ export default function Room() {
     const playerCount = countSnap.data().count;
     if (playerCount >= 2) return;
 
-    await setDoc(doc(playersRef, uid), { uid });
+    await setDoc(doc(playersRef, uid), { uid, ready: false }, { merge: true });
   }
 
   const leaveMatch = async () => {
@@ -114,6 +118,36 @@ export default function Room() {
     });
   };
 
+  const refreshAbility = (index: number) => {
+    if (refreshUsed) return;
+    setMoveOrder(prev => {
+      if (index < 0 || index >= prev.length) return prev;
+      const currentId = prev[index];
+      let nextId = currentId;
+      if (moveList.length > 0) {
+        for (let i = 0; i < moveList.length * 2; i++) {
+          const candidate = moveList[Math.floor(Math.random() * moveList.length)].id;
+          if (candidate !== currentId || moveList.length === 1) {
+            nextId = candidate as MoveId;
+            break;
+          }
+        }
+      }
+      const next = [...prev];
+      next[index] = nextId;
+      return next;
+    });
+    setRefreshUsed(true);
+  };
+
+  const setReady = async (flag: boolean) => {
+    if (!roomId || !auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    const playersRef = collection(db, "rooms", roomId, "match", "current", "players");
+    await setDoc(doc(playersRef, uid), { uid, ready: flag }, { merge: true });
+    setMyReady(flag);
+  };
+
   // Auto-leave the match if the user navigates away or closes the tab.
   useEffect(() => {
     if (!roomId || !auth.currentUser) return;
@@ -138,6 +172,18 @@ export default function Room() {
       const uids = snap.docs.map(d => d.id);
       setSlotAUid(uids[0] ?? null);
       setSlotBUid(uids[1] ?? null);
+
+      const currentUid = auth.currentUser?.uid;
+      let readyCount = 0;
+      let selfReady = false;
+      snap.docs.forEach(d => {
+        const data = d.data() as { ready?: boolean };
+        const r = Boolean(data?.ready);
+        if (r) readyCount += 1;
+        if (d.id === currentUid) selfReady = r;
+      });
+      setMyReady(selfReady);
+      setAllReady(snap.docs.length >= 2 && readyCount === snap.docs.length);
     });
     return unsub;
   }, [roomId]);
@@ -167,7 +213,7 @@ export default function Room() {
     const userRef = doc(db, "users", auth.currentUser.uid);
     return onSnapshot(userRef, snap => {
       const pet = snap.data()?.pet ?? {};
-      const moves = Array.isArray(pet.moves) ? pet.moves.filter((m: unknown): m is string => typeof m === "string") : [];
+      const moves = Array.isArray(pet.moves) ? pet.moves.filter((m: unknown): m is MoveId => typeof m === "string" && m in moveSet) : [];
       setMyMoves(moves);
       // If the moveOrder is empty or moves changed length, reset order to the fetched moves.
       setMoveOrder(prev => (prev.length === 0 || prev.length !== moves.length ? [...moves] : prev));
@@ -183,6 +229,20 @@ export default function Room() {
     }
   }, [roomId, slotAUid, slotBUid]);
 
+  useEffect(() => {
+    // New matchup or player change: clear refresh and local ready flag.
+    if (slotAUid && slotBUid) {
+      setRefreshUsed(false);
+      setMyReady(false);
+    }
+  }, [slotAUid, slotBUid]);
+
+  useEffect(() => {
+    if (!myReady) {
+      setRefreshUsed(false);
+    }
+  }, [myReady]);
+
   if (!roomId) return <div className="room">No room selected.</div>;
 
   return (
@@ -192,6 +252,16 @@ export default function Room() {
           <p className="eyebrow">Room</p>
           <button onClick={joinMatch}>join match</button>
           <button onClick={leaveMatch}>leave match</button>
+          {slotAUid && slotBUid ? (
+            <>
+              <button onClick={() => setReady(!myReady)} className="button-link secondary">
+                {myReady ? "Unready" : "Ready"}
+              </button>
+              <span className="muted" style={{ marginLeft: "0.5rem" }}>
+                {allReady ? "Both players ready — match starting" : "Waiting for both players to ready"}
+              </span>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -206,15 +276,19 @@ export default function Room() {
                   <span className="muted">Reorder locally — database stays unchanged</span>
                 </div>
                 <ul className="ability-list">
-                  {moveOrder.map((moveId, idx) => (
-                    <li key={`${moveId}-${idx}`} className="ability-row">
-                      <span className="ability-name">{moveId}</span>
-                      <div className="ability-actions">
-                        <button onClick={() => moveUp(idx)} disabled={idx === 0}>↑</button>
-                        <button onClick={() => moveDown(idx)} disabled={idx === moveOrder.length - 1}>↓</button>
-                      </div>
-                    </li>
-                  ))}
+                  {moveOrder.map((moveId, idx) => {
+                    const label = moveSet[moveId]?.name ?? moveId;
+                    return (
+                      <li key={`${moveId}-${idx}`} className="ability-row">
+                        <span className="ability-name">{label}</span>
+                        <div className="ability-actions">
+                          <button onClick={() => moveUp(idx)} disabled={idx === 0}>↑</button>
+                          <button onClick={() => moveDown(idx)} disabled={idx === moveOrder.length - 1}>↓</button>
+                          <button onClick={() => refreshAbility(idx)} disabled={refreshUsed}>Refresh</button>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ) : null}
