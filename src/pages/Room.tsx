@@ -32,9 +32,13 @@ export default function Room() {
   const [refreshUsed, setRefreshUsed] = useState(false);
   const [myReady, setMyReady] = useState(false);
   const [allReady, setAllReady] = useState(false);
-
-  const [roundIndex, setRoundIndex] = useState(0);
-  const [roundActive, setRoundActive] = useState(false);
+  const [roundStart, setRoundStart] = useState(false);
+  const [player1Queue, setPlayer1Queue] = useState<MoveId[]>([]);
+  const [player2Queue, setPlayer2Queue] = useState<MoveId[]>([]);
+  const [player1Health, setPlayer1Health] = useState(100);
+  const [player2Health, setPlayer2Health] = useState(100);
+  const [battleLog, setBattleLog] = useState<string[]>([]);
+  const [winner, setWinner] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const identity = getIdentity(auth);
@@ -95,11 +99,6 @@ export default function Room() {
     await deleteDoc(doc(playersRef, uid)); // now matches the join doc id
   };
 
-  const startRound = async () => {
-    setRoundActive(true);
-    
-  }
-
   const moveUp = (index: number) => {
     if (index <= 0) return;
     setMoveOrder(prev => {
@@ -144,7 +143,16 @@ export default function Room() {
     if (!roomId || !auth.currentUser) return;
     const uid = auth.currentUser.uid;
     const playersRef = collection(db, "rooms", roomId, "match", "current", "players");
-    await setDoc(doc(playersRef, uid), { uid, ready: flag }, { merge: true });
+    const movesToPersist = moveOrder.length > 0 ? moveOrder : myMoves;
+    await setDoc(
+      doc(playersRef, uid),
+      {
+        uid,
+        ready: flag,
+        moves: movesToPersist,
+      },
+      { merge: true }
+    );
     setMyReady(flag);
   };
 
@@ -188,6 +196,116 @@ export default function Room() {
     return unsub;
   }, [roomId]);
 
+  // start battle when both players are ready
+  useEffect(() => {
+    if (!allReady || roundStart || !roomId || !slotAUid || !slotBUid) return;
+    let cancelled = false;
+    (async () => {
+      const matchRef = doc(db, "rooms", roomId, "match", "current");
+      const playersRef = collection(matchRef, "players");
+      const snap = await getDocs(playersRef);
+      const bottomDoc = snap.docs.find(d => d.id === slotBUid) ?? snap.docs[0];
+      const topDoc =
+        snap.docs.find(d => d.id === slotAUid) ??
+        snap.docs.find(d => d.id !== bottomDoc?.id) ??
+        snap.docs[0];
+
+      const toMoveIds = (value: unknown): MoveId[] =>
+        Array.isArray(value)
+          ? value.filter((m: unknown): m is MoveId => typeof m === "string" && m in moveSet)
+          : [];
+
+      const player1Moves = toMoveIds(bottomDoc?.data()?.moves);
+      const player2Moves = toMoveIds(topDoc?.data()?.moves);
+
+      if (cancelled) return;
+      setPlayer1Queue(player1Moves);
+      setPlayer2Queue(player2Moves);
+      setPlayer1Health(100);
+      setPlayer2Health(100);
+      setBattleLog([]);
+      setWinner(null);
+      setRoundStart(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [allReady, roundStart, roomId, slotAUid, slotBUid]);
+
+  // reset when players unready or leave
+  useEffect(() => {
+    if (!allReady) {
+      setRoundStart(false);
+      setPlayer1Queue([]);
+      setPlayer2Queue([]);
+      setWinner(null);
+      setBattleLog([]);
+      setPlayer1Health(100);
+      setPlayer2Health(100);
+    }
+  }, [allReady]);
+
+  // process turns sequentially
+  useEffect(() => {
+    if (!roundStart || winner) return;
+    if (player1Queue.length === 0 && player2Queue.length === 0) return;
+
+    const timer = setTimeout(() => {
+      const p1Move = player1Queue[0];
+      const p2Move = player2Queue[0];
+
+      if (p1Move) {
+        const dmg = moveSet[p1Move]?.move.getDammageDealt() ?? 0;
+        if (dmg > 0) {
+          setPlayer2Health(h => Math.max(0, h - dmg));
+          setBattleLog(log => [...log.slice(-5), `Player 1 used ${moveSet[p1Move]?.name ?? p1Move} (-${dmg} HP)`]);
+        } else {
+          setBattleLog(log => [...log.slice(-5), `Player 1 used ${moveSet[p1Move]?.name ?? p1Move}`]);
+        }
+      }
+
+      if (p2Move) {
+        const dmg = moveSet[p2Move]?.move.getDammageDealt() ?? 0;
+        if (dmg > 0) {
+          setPlayer1Health(h => Math.max(0, h - dmg));
+          setBattleLog(log => [...log.slice(-5), `Player 2 used ${moveSet[p2Move]?.name ?? p2Move} (-${dmg} HP)`]);
+        } else {
+          setBattleLog(log => [...log.slice(-5), `Player 2 used ${moveSet[p2Move]?.name ?? p2Move}`]);
+        }
+      }
+
+      setPlayer1Queue(prev => (prev.length ? prev.slice(1) : prev));
+      setPlayer2Queue(prev => (prev.length ? prev.slice(1) : prev));
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [roundStart, player1Queue, player2Queue, winner]);
+
+  // determine winner based on health or exhausted moves
+  useEffect(() => {
+    if (!roundStart || winner) return;
+    if (player1Health <= 0 && player2Health <= 0) {
+      setWinner("Draw");
+      return;
+    }
+    if (player1Health <= 0) {
+      setWinner("Player 2");
+      return;
+    }
+    if (player2Health <= 0) {
+      setWinner("Player 1");
+      return;
+    }
+    if (player1Queue.length === 0 && player2Queue.length === 0) {
+      if (player1Health === player2Health) {
+        setWinner("Draw");
+      } else {
+        setWinner(player1Health > player2Health ? "Player 1" : "Player 2");
+      }
+    }
+  }, [roundStart, winner, player1Health, player2Health, player1Queue, player2Queue]);
+
   useEffect(() => {
     if (!slotAUid) return;
     const userRef = doc(db, "users", slotAUid);
@@ -221,19 +339,17 @@ export default function Room() {
   }, [roomId, auth.currentUser?.uid]);
 
   useEffect(() => {
-    if (!roomId) return;
-    if (slotAUid && slotBUid) {
-      setRoundActive(true);
-    } else {
-      setRoundActive(false);
-    }
-  }, [roomId, slotAUid, slotBUid]);
-
-  useEffect(() => {
-    // New matchup or player change: clear refresh and local ready flag.
     if (slotAUid && slotBUid) {
       setRefreshUsed(false);
       setMyReady(false);
+    } else {
+      setRoundStart(false);
+      setPlayer1Queue([]);
+      setPlayer2Queue([]);
+      setBattleLog([]);
+      setWinner(null);
+      setPlayer1Health(100);
+      setPlayer2Health(100);
     }
   }, [slotAUid, slotBUid]);
 
@@ -242,6 +358,25 @@ export default function Room() {
       setRefreshUsed(false);
     }
   }, [myReady]);
+
+  const renderMoveTrack = (queue: MoveId[], label: string) => (
+    <div className="move-track__inner">
+      <span className="move-track__label">{label}</span>
+      <div className="move-track__list">
+        {queue.length === 0 ? (
+          <span className="muted">No moves queued</span>
+        ) : (
+          queue.map((moveId, idx) => (
+            <span key={`${moveId}-${idx}`} className={`move-pill ${idx === 0 ? "active" : ""}`}>
+              {moveSet[moveId]?.name ?? moveId}
+            </span>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  const healthPercent = (value: number) => Math.max(0, Math.min(100, value));
 
   if (!roomId) return <div className="room">No room selected.</div>;
 
@@ -269,7 +404,17 @@ export default function Room() {
         <div className="room-main-placeholder" aria-hidden="true">
           <div className="battle-field">
             <div className="battle-sky" />
-            {roundActive && moveOrder.length > 0 ? (
+            {roundStart ? (
+              <>
+                <div className="move-track move-track--top">
+                  {renderMoveTrack(player2Queue, "Player 2 moves")}
+                </div>
+                <div className="move-track move-track--bottom">
+                  {renderMoveTrack(player1Queue, "Player 1 moves")}
+                </div>
+              </>
+            ) : null}
+            {slotAUid && slotBUid && !allReady && moveOrder.length > 0 ? (
               <div className="ability-panel">
                 <div className="ability-header">
                   <p className="eyebrow">Your abilities</p>
@@ -292,9 +437,27 @@ export default function Room() {
                 </ul>
               </div>
             ) : null}
+            {roundStart ? (
+              <div className="health-hud">
+                <div className="health-badge enemy">
+                  <span className="health-label">Player 2 HP</span>
+                  <div className="health-bar">
+                    <span style={{ width: `${healthPercent(player2Health)}%` }} />
+                  </div>
+                  <strong>{player2Health}</strong>
+                </div>
+                <div className="health-badge player">
+                  <span className="health-label">Player 1 HP</span>
+                  <div className="health-bar">
+                    <span style={{ width: `${healthPercent(player1Health)}%` }} />
+                  </div>
+                  <strong>{player1Health}</strong>
+                </div>
+              </div>
+            ) : null}
             <div className="battle-grid">
               <div className="battle-slot enemy-slot">
-                <div className="slot-label">{slotAUid ? "Player 1" : "Waiting for player"}</div>
+                <div className="slot-label">{slotAUid ? "Player 2" : "Waiting for player"}</div>
                 {slotAUid ? (
                   <div className="battle-pet">
                     <Pet
@@ -312,7 +475,7 @@ export default function Room() {
               </div>
 
               <div className="battle-slot player-slot">
-                <div className="slot-label">{slotBUid ? "Player 2" : "Waiting for player"}</div>
+                <div className="slot-label">{slotBUid ? "Player 1" : "Waiting for player"}</div>
                 {slotBUid ? (
                   <div className="battle-pet">
                     <Pet
@@ -329,6 +492,16 @@ export default function Room() {
                 ) : null}
               </div>
             </div>
+            {roundStart ? (
+              <div className="battle-log">
+                {winner ? <div className="winner-banner">Winner: {winner}</div> : null}
+                <ul>
+                  {battleLog.map((entry, idx) => (
+                    <li key={`${entry}-${idx}`}>{entry}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         </div>
 

@@ -886,6 +886,62 @@ button.ghost {
   z-index: 1;
 }
 
+.move-track {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(600px, calc(100% - 2rem));
+  z-index: 3;
+}
+
+.move-track--top {
+  top: 0.5rem;
+}
+
+.move-track--bottom {
+  bottom: 0.5rem;
+}
+
+.move-track__inner {
+  background: rgba(5, 5, 12, 0.8);
+  border: 1px solid #2a2a33;
+  border-radius: 12px;
+  padding: 0.5rem 0.75rem;
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.move-track__label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #c7cbda;
+}
+
+.move-track__list {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.move-pill {
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.move-pill.active {
+  background: linear-gradient(135deg, #6c63ff, #9f7aea);
+  border-color: #7d73ff;
+  color: #fff;
+}
+
 .ability-panel {
   position: absolute;
   top: 0.5rem;
@@ -955,6 +1011,83 @@ button.ghost {
 .ability-actions button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.health-hud {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  z-index: 1;
+}
+
+.health-badge {
+  flex: 1;
+  background: rgba(10, 10, 16, 0.85);
+  border: 1px solid #2a2a33;
+  border-radius: 12px;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.health-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #9aa0b5;
+}
+
+.health-bar {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.health-bar span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #ff7a7a, #ffce7a);
+  border-radius: 999px;
+}
+
+.battle-log {
+  margin-top: 1rem;
+  background: rgba(10, 10, 16, 0.85);
+  border: 1px solid #2a2a33;
+  border-radius: 12px;
+  padding: 0.75rem;
+  z-index: 1;
+}
+
+.battle-log ul {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.battle-log li {
+  color: #d7dbff;
+}
+
+.winner-banner {
+  padding: 0.4rem 0.6rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(108,99,255,0.25), rgba(159,122,234,0.25));
+  border: 1px solid rgba(108,99,255,0.35);
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
 }
 
 .battle-slot {
