@@ -730,38 +730,48 @@ export default function Room() {
             <div className="battle-grid">
               <div className="battle-slot enemy-slot">
                 <div className="slot-label">{slotAUid ? "Player 2" : "Waiting for player"}</div>
-                {slotAUid ? (
-                  <div className="battle-pet">
-                    <Pet
-                      petEvolution={slotAEvolutions}
-                      petChoice={slotAPetChoice}
-                      stage={"Baby"}
-                      health={0}
-                      attack={0}
-                      defence={0}
-                      energy={0}
-                      avaulableMoves={null}
-                    />
-                  </div>
-                ) : null}
+                <div className="slot-holder">
+                  <div className="slot-circle" aria-hidden="true" />
+                  {slotAUid ? (
+                    <div className="battle-pet">
+                      <Pet
+                        petEvolution={slotAEvolutions}
+                        petChoice={slotAPetChoice}
+                        stage={"Baby"}
+                        health={0}
+                        attack={0}
+                        defence={0}
+                        energy={0}
+                        avaulableMoves={null}
+                      />
+                    </div>
+                  ) : (
+                    <span className="slot-empty muted">Awaiting challenger</span>
+                  )}
+                </div>
               </div>
 
               <div className="battle-slot player-slot">
                 <div className="slot-label">{slotBUid ? "Player 1" : "Waiting for player"}</div>
-                {slotBUid ? (
-                  <div className="battle-pet">
-                    <Pet
-                      petEvolution={slotBEvolutions}
-                      petChoice={slotBPetChoice}
-                      stage={"Baby"}
-                      health={0}
-                      attack={0}
-                      defence={0}
-                      energy={0}
-                      avaulableMoves={null}
-                    />
-                  </div>
-                ) : null}
+                <div className="slot-holder">
+                  <div className="slot-circle" aria-hidden="true" />
+                  {slotBUid ? (
+                    <div className="battle-pet">
+                      <Pet
+                        petEvolution={slotBEvolutions}
+                        petChoice={slotBPetChoice}
+                        stage={"Baby"}
+                        health={0}
+                        attack={0}
+                        defence={0}
+                        energy={0}
+                        avaulableMoves={null}
+                      />
+                    </div>
+                  ) : (
+                    <span className="slot-empty muted">Awaiting contender</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>

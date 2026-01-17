@@ -940,18 +940,18 @@ button.ghost {
 
 .move-track {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(600px, calc(100% - 2rem));
   z-index: 3;
+  width: min(420px, calc(100% - 2.5rem));
 }
 
 .move-track--top {
-  top: 0.5rem;
+  top: 0.75rem;
+  left: 1rem;
 }
 
 .move-track--bottom {
-  bottom: 0.5rem;
+  bottom: 0.75rem;
+  right: 1rem;
 }
 
 .move-track__inner {
@@ -1182,9 +1182,9 @@ button.ghost {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
   overflow: visible;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 1.25rem 1rem 1.5rem;
   border: 1px solid rgba(144, 198, 255, 0.18);
 }
 
@@ -1223,11 +1223,11 @@ button.ghost {
 .battle-pet {
   position: relative;
   z-index: 2;
-  transform: translateY(130px);
+  transform: none;
   display: flex;
   justify-content: center;
   align-items: center;
-  width: clamp(160px, 26vw, 240px);
+  width: clamp(140px, 24vw, 220px);
 }
 
 /* Only in the room battle field, strip the default pet shell styling so sprites sit directly on the field */
@@ -1240,6 +1240,46 @@ button.ghost {
 .battle-pet .pet-avatar {
   width: 100%;
   height: auto;
+}
+
+.slot-holder {
+  position: relative;
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.slot-circle {
+  position: absolute;
+  bottom: 6%;
+  left: 10%;
+  right: 10%;
+  height: 48%;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow: 0 25px 35px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
+  filter: blur(0.2px);
+  opacity: 0.95;
+  transition: transform 200ms ease, opacity 200ms ease;
+}
+
+.slot-holder:hover .slot-circle {
+  transform: translateY(2px);
+  opacity: 1;
+}
+
+.slot-empty {
+  position: relative;
+  z-index: 2;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px dashed rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
 }
 
 .enemy-slot .slot-circle {
