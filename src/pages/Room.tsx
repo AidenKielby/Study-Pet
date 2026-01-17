@@ -244,7 +244,7 @@ export default function Room() {
                 </div>
                 <ul className="ability-list">
                   {moveOrder.map((moveId, idx) => (
-                    <li key={moveId} className="ability-row">
+                    <li key={`${moveId}-${idx}`} className="ability-row">
                       <span className="ability-name">{moveId}</span>
                       <div className="ability-actions">
                         <button onClick={() => moveUp(idx)} disabled={idx === 0}>↑</button>
